@@ -392,10 +392,10 @@ export default function GoalsPage() {
   return (
     <AppShell 
         navContent={SidebarContent} 
-        navTitle="Project Goals"
+        navTitle="Project Brief"
         statusContent={
             <SummaryCard 
-                title="Goals Status"
+                title="Brief Status"
                 status={summaryStatus}
                 done={summaryDone}
                 undone={summaryUndone}

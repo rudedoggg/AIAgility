@@ -62,8 +62,8 @@ export default function PreferencesPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="dashboard">Dashboard</SelectItem>
-                    <SelectItem value="goals">Goals</SelectItem>
-                    <SelectItem value="lab">Lab</SelectItem>
+                    <SelectItem value="goals">Brief</SelectItem>
+                    <SelectItem value="lab">Discovery</SelectItem>
                     <SelectItem value="deliverables">Deliverables</SelectItem>
                   </SelectContent>
                 </Select>

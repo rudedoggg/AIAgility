@@ -285,7 +285,7 @@ export default function LabPage() {
         navTitle="Knowledge Buckets"
         statusContent={
             <SummaryCard 
-                title="Lab Status"
+                title="Discovery Status"
                 status="Seeded from the project summary. Next: capture evidence and open questions."
                 done={[]}
                 undone={["Add first evidence bucket"]}

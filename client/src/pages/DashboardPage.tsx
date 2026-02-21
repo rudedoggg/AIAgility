@@ -173,7 +173,7 @@ export default function DashboardPage() {
                       >
                         {!executiveSummary && (
                           <p className="text-sm text-muted-foreground">
-                            This project is currently empty. Create Goals, Knowledge Buckets, and Deliverables to get an executive summary.
+                            This project is currently empty. Create Brief sections, Discovery Buckets, and Deliverables to get an executive summary.
                           </p>
                         )}
                         {!!executiveSummary && executiveSummary.split("\n").map((line, i) => {

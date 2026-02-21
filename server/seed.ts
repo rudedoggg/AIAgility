@@ -7,7 +7,7 @@ function executiveSummaryFor(name: string) {
 Give me a two-page executive summary of this project.
 
 ## Summary (Draft)
-This project is currently in early structuring. The goal is to clarify scope, establish decision criteria, collect the right evidence, and produce decision-ready deliverables. The workspace is organized into Goals (what "good" looks like), Lab (evidence and knowledge buckets), and Deliverables (outputs for stakeholders).
+This project is currently in early structuring. The goal is to clarify scope, establish decision criteria, collect the right evidence, and produce decision-ready deliverables. The workspace is organized into Brief (what “good” looks like), Discovery (evidence and knowledge buckets), and Deliverables (outputs for stakeholders).
 
 Over the next iterations, the main focus is to tighten the feedback loop between new evidence and updated deliverables.
 
@@ -147,7 +147,7 @@ export async function seedDemoData(userId?: string) {
   const baseMessages = [
     { role: "ai", content: "I'm ready. What's the decision or outcome you're driving toward?", timestamp: "10:00 AM", hasSaveableContent: false, saved: false, sortOrder: 0 },
     { role: "user", content: "Help me structure this project so we can move faster with fewer blind spots.", timestamp: "10:01 AM", hasSaveableContent: false, saved: false, sortOrder: 1 },
-    { role: "ai", content: "Got it. I'll help define goals, collect research, and produce deliverables. When I suggest content, you can save it to a specific bucket.", timestamp: "10:02 AM", hasSaveableContent: true, saved: false, sortOrder: 2 },
+    { role: "ai", content: "Got it. I'll help define the brief, collect research, and produce deliverables. When I suggest content, you can save it to a specific bucket.", timestamp: "10:02 AM", hasSaveableContent: true, saved: false, sortOrder: 2 },
   ];
 
   for (const pid of [p1.id, p2.id, p3.id]) {

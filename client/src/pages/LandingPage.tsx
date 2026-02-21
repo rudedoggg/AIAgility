@@ -78,13 +78,13 @@ export default function LandingPage() {
               />
               <FeatureCard
                 icon={<Target className="w-5 h-5" />}
-                title="Goals"
+                title="Brief"
                 description="Define objectives, stakeholders, and constraints in structured sections."
                 testId="card-feature-goals"
               />
               <FeatureCard
                 icon={<Beaker className="w-5 h-5" />}
-                title="Lab"
+                title="Discovery"
                 description="Organize evidence into knowledge buckets with notes, links, and files."
                 testId="card-feature-lab"
               />

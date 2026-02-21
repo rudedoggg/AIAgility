@@ -1,7 +1,7 @@
 # AgilityAI — Decision-Making & Project Management Tool
 
 ## Overview
-A decision-making and project management tool with four main sections: Dashboard, Goals, Lab/Knowledge Buckets, and Deliverables. Projects are selected via a header dropdown and switching projects updates all pages. Supports two levels of AI chat: global page-level and bucket-scoped conversations. Features user authentication via Replit Auth (OIDC) with admin and regular user roles.
+A decision-making and project management tool with four main sections: Dashboard, Brief, Discovery/Knowledge Buckets, and Deliverables. Projects are selected via a header dropdown and switching projects updates all pages. Supports two levels of AI chat: global page-level and bucket-scoped conversations. Features user authentication via Replit Auth (OIDC) with admin and regular user roles.
 
 ## Architecture
 - **Frontend**: React + Vite + TypeScript, Tailwind CSS + shadcn/ui, wouter routing, @tanstack/react-query for data fetching

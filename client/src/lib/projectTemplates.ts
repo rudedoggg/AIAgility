@@ -72,7 +72,7 @@ function executiveSummaryFor(projectName: string) {
 Give me a two-page executive summary of this project.
 
 ## Summary (Draft)
-This project is currently in early structuring. The goal is to clarify scope, establish decision criteria, collect the right evidence, and produce decision-ready deliverables. The workspace is organized into Goals (what “good” looks like), Lab (evidence and knowledge buckets), and Deliverables (outputs for stakeholders).
+This project is currently in early structuring. The goal is to clarify scope, establish decision criteria, collect the right evidence, and produce decision-ready deliverables. The workspace is organized into Brief (what “good” looks like), Discovery (evidence and knowledge buckets), and Deliverables (outputs for stakeholders).
 
 Over the next iterations, the main focus is to tighten the feedback loop between new evidence and updated deliverables. The system supports two layers of conversation: a global thread that can reference the entire page, and bucket-scoped threads that are constrained to the bucket’s attachments and local history.
 
@@ -94,9 +94,9 @@ export function getProjectTemplates() {
       },
       executiveSummary: executiveSummaryFor("Office Location Decision"),
       goals: {
-        navTitle: "Project Goals",
+        navTitle: "Project Brief",
         summary: {
-          status: "Goals are partially defined. The objective is clear; constraints need numbers.",
+          status: "Brief is partially defined. The objective is clear; constraints need numbers.",
           done: ["Context defined", "Objective drafted"],
           undone: ["Stakeholder list incomplete", "Financial constraints undefined"],
           nextSteps: ["Confirm budget", "Confirm stakeholder list"],
@@ -226,7 +226,7 @@ export function getProjectTemplates() {
       },
       executiveSummary: executiveSummaryFor("Commute Impact Study"),
       goals: {
-        navTitle: "Project Goals",
+        navTitle: "Project Brief",
         summary: {
           status: "Objective is defined as a model. Constraints are mostly technical/data-related.",
           done: ["Drafted research question"],
@@ -351,7 +351,7 @@ export function getProjectTemplates() {
       },
       executiveSummary: executiveSummaryFor("Board Memo Draft"),
       goals: {
-        navTitle: "Project Goals",
+        navTitle: "Project Brief",
         summary: {
           status: "Goal is a strong narrative: decision, rationale, risks, and next steps.",
           done: ["Drafted memo outline"],
