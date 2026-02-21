@@ -17,7 +17,7 @@ const LOCATIONS = [
     scope: "Page Chat",
   },
   {
-    key: "goal_page",
+    key: "brief_page",
     label: "Brief — Page-Level AI",
     description: "This context is prepended to every user message in the main chat area at the top of the Brief page.",
     icon: Target,
@@ -25,7 +25,7 @@ const LOCATIONS = [
     scope: "Page Chat",
   },
   {
-    key: "goal_bucket",
+    key: "brief_bucket",
     label: "Brief — Bucket-Level AI",
     description: "This context is prepended to every user message inside any individual brief section's expandable chat.",
     icon: FolderOpen,
@@ -33,7 +33,7 @@ const LOCATIONS = [
     scope: "Bucket Chat",
   },
   {
-    key: "lab_page",
+    key: "discovery_page",
     label: "Discovery — Page-Level AI",
     description: "This context is prepended to every user message in the main chat area at the top of the Discovery page.",
     icon: Beaker,
@@ -41,7 +41,7 @@ const LOCATIONS = [
     scope: "Page Chat",
   },
   {
-    key: "lab_bucket",
+    key: "discovery_bucket",
     label: "Discovery — Bucket-Level AI",
     description: "This context is prepended to every user message inside any individual knowledge bucket's expandable chat.",
     icon: FolderOpen,

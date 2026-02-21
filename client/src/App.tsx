@@ -4,8 +4,8 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
-import GoalsPage from "@/pages/GoalsPage";
-import LabPage from "@/pages/LabPage";
+import BriefPage from "@/pages/BriefPage";
+import DiscoveryPage from "@/pages/DiscoveryPage";
 import DeliverablesPage from "@/pages/DeliverablesPage";
 import DashboardPage from "@/pages/DashboardPage";
 import PreferencesPage from "@/pages/PreferencesPage";
@@ -25,9 +25,9 @@ import { Loader2 } from "lucide-react";
 function AuthenticatedRouter() {
   return (
     <Switch>
-      <Route path="/" component={GoalsPage} />
+      <Route path="/" component={BriefPage} />
       <Route path="/dashboard" component={DashboardPage} />
-      <Route path="/lab" component={LabPage} />
+      <Route path="/discovery" component={DiscoveryPage} />
       <Route path="/deliverables" component={DeliverablesPage} />
 
       <Route path="/settings/preferences" component={PreferencesPage} />

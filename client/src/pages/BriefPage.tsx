@@ -1,6 +1,4 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { api, type ApiLabBucket, type ApiBucketItem, type ApiChatMessage } from "@/lib/api";
 import {
   DndContext,
   DragEndEvent,
@@ -16,13 +14,19 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { api, type ApiBriefSection, type ApiBucketItem, type ApiChatMessage } from "@/lib/api";
 import { AppShell } from "@/components/layout/AppShell";
 import { ChatWorkspace } from "@/components/shared/ChatWorkspace";
 import { getSelectedProject, subscribeToSelectedProject } from "@/lib/projectStore";
-import { Message, Bucket } from "@/lib/types";
-import { FileText, Link as LinkIcon, MessageSquare, StickyNote, FolderOpen, Folder, Plus, ChevronRight, Upload, Link2, RefreshCw, Trash2 } from "lucide-react";
+import { Message, Section } from "@/lib/types";
+import { ChevronRight, Target, Flag, Users, AlertTriangle, Circle, ChevronDown, StickyNote, Upload, Link2, RefreshCw, Trash2, FileText as FileTextIcon } from "lucide-react";
 import { cn, getBucketProgressPercent } from "@/lib/utils";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { motion, AnimatePresence } from "framer-motion";
@@ -41,31 +45,51 @@ const ACCENT_COLORS = [
   "border-t-orange-400",
 ];
 
-type BucketWithMessages = Bucket & { bucketMessages: Message[] };
+function getSectionIcon(id: string) {
+    switch (id) {
+        case 'context': return <Flag className="w-3.5 h-3.5" />;
+        case 'objective': return <Target className="w-3.5 h-3.5" />;
+        case 'stakeholders': return <Users className="w-3.5 h-3.5" />;
+        case 'constraints': return <AlertTriangle className="w-3.5 h-3.5" />;
+        default: return <Circle className="w-3.5 h-3.5" />;
+    }
+}
 
-export default function LabPage() {
+type LocalSection = Section & { bucketMessages?: Message[] };
+
+export default function BriefPage() {
+  const queryClient = useQueryClient();
   const { prependContext } = useCoreQueries();
   const [activeProject, setActiveProject] = useState(getSelectedProject());
-  const [buckets, setBuckets] = useState<BucketWithMessages[]>([]);
+
+  const { data: briefSections } = useQuery({
+    queryKey: ["/api/projects", activeProject.id, "brief"],
+    queryFn: () => api.brief.list(activeProject.id),
+    enabled: !!activeProject.id,
+  });
+
+  const { data: pageMessages } = useQuery({
+    queryKey: ["/api/messages", "brief_page", activeProject.id],
+    queryFn: () => api.messages.list("brief_page", activeProject.id),
+    enabled: !!activeProject.id,
+  });
+
+  const { data: projectData } = useQuery({
+    queryKey: ["/api/projects", activeProject.id],
+    queryFn: () => api.projects.get(activeProject.id),
+    enabled: !!activeProject.id,
+  });
+
   const [messages, setMessages] = useState<Message[]>([]);
-  const bucketRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
+  const [sections, setSections] = useState<LocalSection[]>([]);
+  const [sectionItems, setSectionItems] = useState<Record<string, ApiBucketItem[]>>({});
+  const [bucketMessages, setBucketMessages] = useState<Record<string, Message[]>>({});
+  const sectionRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
-  const { data: apiBuckets } = useQuery({
-    queryKey: ["/api/projects", activeProject.id, "lab"],
-    queryFn: () => api.lab.list(activeProject.id),
-    enabled: !!activeProject.id,
-  });
-
-  const { data: apiPageMessages } = useQuery({
-    queryKey: ["/api/messages", "lab_page", activeProject.id],
-    queryFn: () => api.messages.list("lab_page", activeProject.id),
-    enabled: !!activeProject.id,
-  });
-
   useEffect(() => {
-    if (apiPageMessages) {
-      setMessages(apiPageMessages.map(m => ({
+    if (pageMessages) {
+      setMessages(pageMessages.map(m => ({
         id: m.id,
         role: m.role as 'user' | 'ai',
         content: m.content,
@@ -74,81 +98,143 @@ export default function LabPage() {
         saved: m.saved,
       })));
     }
-  }, [apiPageMessages]);
+  }, [pageMessages]);
 
   useEffect(() => {
-    if (!apiBuckets || !Array.isArray(apiBuckets)) return;
+    if (briefSections) {
+      setSections(prev => {
+        const openState: Record<string, boolean> = {};
+        prev.forEach(s => { openState[s.id] = !!s.isOpen; });
 
-    setBuckets(prev => {
-      const prevMap = new Map(prev.map(b => [b.id, b]));
-      return apiBuckets.map(ab => {
-        const existing = prevMap.get(ab.id);
-        return {
-          id: ab.id,
-          name: ab.name,
-          items: existing?.items || [],
-          isOpen: existing?.isOpen || false,
-          bucketMessages: existing?.bucketMessages || [],
-        };
+        return briefSections.map(gs => ({
+          id: gs.id,
+          genericName: gs.genericName,
+          subtitle: gs.subtitle,
+          completeness: gs.completeness,
+          totalItems: gs.totalItems,
+          completedItems: gs.completedItems,
+          content: gs.content,
+          items: (sectionItems[gs.id] || []).map(i => ({
+            id: i.id,
+            type: i.type as 'doc' | 'link' | 'chat' | 'note' | 'file',
+            title: i.title,
+            preview: i.preview,
+            date: i.date,
+            url: i.url || undefined,
+            fileName: i.fileName || undefined,
+            fileSizeLabel: i.fileSizeLabel || undefined,
+          })),
+          isOpen: openState[gs.id] || false,
+          bucketMessages: bucketMessages[gs.id] || [],
+        }));
       });
-    });
-
-    apiBuckets.forEach(ab => {
-      api.items.list("lab", ab.id).then(items => {
-        setBuckets(prev => prev.map(b => {
-          if (b.id !== ab.id) return b;
-          return {
-            ...b,
-            items: items.map(i => ({
-              id: i.id,
-              type: i.type as any,
-              title: i.title,
-              preview: i.preview,
-              date: i.date,
-              url: i.url || undefined,
-              fileName: i.fileName || undefined,
-              fileSizeLabel: i.fileSizeLabel || undefined,
-            })),
-          };
-        }));
-      }).catch(() => {});
-
-      api.messages.list("lab_bucket", ab.id).then(msgs => {
-        setBuckets(prev => prev.map(b => {
-          if (b.id !== ab.id) return b;
-          return {
-            ...b,
-            bucketMessages: msgs.map(m => ({
-              id: m.id,
-              role: m.role as 'user' | 'ai',
-              content: m.content,
-              timestamp: m.timestamp,
-              hasSaveableContent: m.hasSaveableContent,
-              saved: m.saved,
-            })),
-          };
-        }));
-      }).catch(() => {});
-    });
-  }, [apiBuckets]);
+    }
+  }, [briefSections, sectionItems, bucketMessages]);
 
   useEffect(() => {
     const unsub = subscribeToSelectedProject((p) => {
       setActiveProject(p);
+      setSectionItems({});
+      setBucketMessages({});
     });
     return () => unsub();
   }, []);
 
-  const toggleBucket = (id: string) => {
-      setBuckets(prev => prev.map(b => b.id === id ? { ...b, isOpen: !b.isOpen } : b));
+  const fetchSectionItems = useCallback(async (sectionId: string) => {
+    if (sectionItems[sectionId]) return;
+    try {
+      const items = await api.items.list("brief", sectionId);
+      setSectionItems(prev => ({ ...prev, [sectionId]: items }));
+    } catch {
+    }
+  }, [sectionItems]);
+
+  const fetchBucketMessages = useCallback(async (sectionId: string) => {
+    if (bucketMessages[sectionId]) return;
+    try {
+      const msgs = await api.messages.list("brief_bucket", sectionId);
+      setBucketMessages(prev => ({
+        ...prev,
+        [sectionId]: msgs.map(m => ({
+          id: m.id,
+          role: m.role as 'user' | 'ai',
+          content: m.content,
+          timestamp: m.timestamp,
+          hasSaveableContent: m.hasSaveableContent,
+          saved: m.saved,
+        })),
+      }));
+    } catch {
+    }
+  }, [bucketMessages]);
+
+  const handleSendMessage = async (content: string) => {
+    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const newMessage: Message = {
+      id: Date.now().toString(),
+      role: 'user',
+      content,
+      timestamp,
+    };
+    
+    setMessages(prev => [...prev, newMessage]);
+
+    api.messages.create({
+      parentId: activeProject.id,
+      parentType: "brief_page",
+      role: "user",
+      content: prependContext("brief_page", content),
+      timestamp,
+      hasSaveableContent: false,
+      saved: false,
+    }).catch(() => {});
+
+    setTimeout(() => {
+        const aiTimestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const aiMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            role: 'ai',
+            content: "I've updated the section with those details.",
+            timestamp: aiTimestamp,
+            hasSaveableContent: true
+        };
+        setMessages(prev => [...prev, aiMessage]);
+
+        api.messages.create({
+          parentId: activeProject.id,
+          parentType: "brief_page",
+          role: "ai",
+          content: aiMessage.content,
+          timestamp: aiTimestamp,
+          hasSaveableContent: true,
+          saved: false,
+        }).catch(() => {});
+    }, 1000);
   };
 
-  const addBucketItem = (bucketId: string, item: Bucket["items"][number]) => {
-      setBuckets(prev => prev.map(b => b.id === bucketId ? { ...b, items: [item, ...b.items] } : b));
+  const toggleSection = (id: string) => {
+      setSections(prev => prev.map(s => {
+        if (s.id === id) {
+          const willOpen = !s.isOpen;
+          if (willOpen) {
+            fetchSectionItems(id);
+            fetchBucketMessages(id);
+          }
+          return { ...s, isOpen: willOpen };
+        }
+        return s;
+      }));
+  };
+
+  const addSectionItem = (sectionId: string, item: NonNullable<Section["items"]>[number]) => {
+      setSectionItems(prev => ({
+        ...prev,
+        [sectionId]: [{ ...item, parentId: sectionId, parentType: "brief", url: (item as any).url || null, fileName: (item as any).fileName || null, fileSizeLabel: (item as any).fileSizeLabel || null, sortOrder: 0 } as ApiBucketItem, ...(prev[sectionId] || [])],
+      }));
 
       api.items.create({
-        parentId: bucketId,
-        parentType: "lab",
+        parentId: sectionId,
+        parentType: "brief",
         type: item.type,
         title: item.title,
         preview: item.preview,
@@ -156,47 +242,49 @@ export default function LabPage() {
         url: (item as any).url || null,
         fileName: (item as any).fileName || null,
         fileSizeLabel: (item as any).fileSizeLabel || null,
-      }).then(created => {
-        setBuckets(prev => prev.map(b => {
-          if (b.id !== bucketId) return b;
-          return {
-            ...b,
-            items: b.items.map(i => i.id === item.id ? { ...i, id: created.id } : i),
-          };
-        }));
       }).catch(() => {});
   };
 
-  const deleteBucketItem = (bucketId: string, itemId: string) => {
-      setBuckets(prev => prev.map(b => b.id === bucketId ? { ...b, items: b.items.filter(i => i.id !== itemId) } : b));
+  const deleteSectionItem = (sectionId: string, itemId: string) => {
+      setSectionItems(prev => ({
+        ...prev,
+        [sectionId]: (prev[sectionId] || []).filter(i => i.id !== itemId),
+      }));
 
       api.items.delete(itemId).catch(() => {});
   };
 
-  const scrollToBucket = (id: string) => {
-      setBuckets(prev => prev.map(b => b.id === id ? { ...b, isOpen: true } : b));
+  const scrollToSection = (id: string) => {
+      setSections(prev => prev.map(s => {
+        if (s.id === id && !s.isOpen) {
+          fetchSectionItems(id);
+          fetchBucketMessages(id);
+          return { ...s, isOpen: true };
+        }
+        return s;
+      }));
       setTimeout(() => {
-          bucketRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          sectionRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 50);
   };
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
-  const bucketIds = useMemo(() => buckets.map((b) => b.id), [buckets]);
+  const sectionIds = useMemo(() => sections.map((s) => s.id), [sections]);
 
-  function SortableNavRow({ bucketId }: { bucketId: string }) {
-    const bucket = buckets.find((b) => b.id === bucketId);
-    const sortable = useSortable({ id: bucketId });
+  function SortableNavRow({ sectionId }: { sectionId: string }) {
+    const section = sections.find((s) => s.id === sectionId);
+    const sortable = useSortable({ id: sectionId });
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = sortable;
 
-    if (!bucket) return null;
+    if (!section) return null;
 
     return (
       <div
         ref={setNodeRef}
         {...attributes}
         {...listeners}
-        data-testid={`nav-row-${bucket.id}`}
-        onClick={() => scrollToBucket(bucket.id)}
+        data-testid={`nav-row-${section.id}`}
+        onClick={() => scrollToSection(section.id)}
         className={cn(
           "flex items-center gap-2 px-3 py-2 text-sm font-medium border-l-2 cursor-pointer transition-colors select-none",
           "border-transparent text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50",
@@ -208,38 +296,81 @@ export default function LabPage() {
           opacity: isDragging ? 0.85 : 1,
         }}
       >
-        <Folder className="w-3.5 h-3.5" />
-        <span className="truncate flex-1">{bucket.name}</span>
-        <span className="text-[10px] bg-sidebar-border px-1.5 rounded-sm">{bucket.items.length}</span>
+        {getSectionIcon(section.id)}
+        <span className="truncate">{section.genericName}</span>
+        <span className="ml-auto text-[10px] font-mono text-muted-foreground">drag</span>
       </div>
     );
   }
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over) return;
+    if (active.id === over.id) return;
+
+    setSections((prev) => {
+      const oldIndex = prev.findIndex((s) => s.id === active.id);
+      const newIndex = prev.findIndex((s) => s.id === over.id);
+      if (oldIndex === -1 || newIndex === -1) return prev;
+      const reordered = arrayMove(prev, oldIndex, newIndex);
+
+      api.brief.reorder(activeProject.id, reordered.map(s => s.id)).catch(() => {});
+
+      return reordered;
+    });
+  };
+
+  const handleAddSection = () => {
+    const name = window.prompt("New brief section", "New section");
+    if (!name) return;
+
+    const tempId = `section-${Date.now()}`;
+    const newSection: LocalSection = {
+      id: tempId,
+      genericName: name,
+      subtitle: "(draft)",
+      completeness: 0,
+      totalItems: 0,
+      completedItems: 0,
+      content: "",
+      items: [],
+      isOpen: true,
+      bucketMessages: [],
+    };
+
+    setSections((prev) => [newSection, ...prev]);
+
+    api.brief.create(activeProject.id, {
+      genericName: name,
+      subtitle: "(draft)",
+      completeness: 0,
+      totalItems: 0,
+      completedItems: 0,
+      content: "",
+    }).then((created) => {
+      setSections(prev => prev.map(s => s.id === tempId ? { ...s, id: created.id } : s));
+    }).catch(() => {});
+
+    setTimeout(() => {
+      sectionRefs.current[tempId]?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  };
+
+  const summaryStatus = projectData?.dashboardStatus?.status || "Seeded from the project summary. Next: make the brief explicit.";
+  const summaryDone = projectData?.dashboardStatus?.done || ["Project seeded"];
+  const summaryUndone = projectData?.dashboardStatus?.undone || ["Define objective", "List constraints"];
+  const summaryNextSteps = projectData?.dashboardStatus?.nextSteps || ["Create brief sections", "Add stakeholders"];
 
   const SidebarContent = (
       <div className="space-y-0">
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
-          onDragEnd={(event: DragEndEvent) => {
-            const { active, over } = event;
-            if (!over) return;
-            if (active.id === over.id) return;
-
-            setBuckets((prev) => {
-              const oldIndex = prev.findIndex((b) => b.id === active.id);
-              const newIndex = prev.findIndex((b) => b.id === over.id);
-              if (oldIndex === -1 || newIndex === -1) return prev;
-              const reordered = arrayMove(prev, oldIndex, newIndex);
-
-              api.lab.reorder(activeProject.id, reordered.map(b => b.id)).catch(() => {});
-
-              return reordered;
-            });
-          }}
+          onDragEnd={handleDragEnd}
         >
-          <SortableContext items={bucketIds} strategy={verticalListSortingStrategy}>
-            {bucketIds.map((id) => (
-              <SortableNavRow key={id} bucketId={id} />
+          <SortableContext items={sectionIds} strategy={verticalListSortingStrategy}>
+            {sectionIds.map((id) => (
+              <SortableNavRow key={id} sectionId={id} />
             ))}
           </SortableContext>
         </DndContext>
@@ -249,82 +380,43 @@ export default function LabPage() {
             variant="ghost"
             size="sm"
             className="w-full justify-start px-3 mt-2 text-xs text-muted-foreground hover:text-primary"
-            onClick={() => {
-              const name = window.prompt("New knowledge bucket", "New bucket");
-              if (!name) return;
-
-              const id = `bucket-${Date.now()}`;
-              setBuckets((prev) => [
-                {
-                  id,
-                  name,
-                  isOpen: true,
-                  items: [],
-                  bucketMessages: [],
-                },
-                ...prev,
-              ]);
-
-              api.lab.create(activeProject.id, { name }).then(created => {
-                setBuckets(prev => prev.map(b => b.id === id ? { ...b, id: created.id, name: created.name } : b));
-              }).catch(() => {});
-
-              setTimeout(() => {
-                bucketRefs.current[id]?.scrollIntoView({ behavior: "smooth", block: "start" });
-              }, 50);
-            }}
+            onClick={handleAddSection}
           >
-            + New Knowledge Bucket
+            + Add Brief Section
           </Button>
       </div>
   );
 
+  const getSectionItemsList = (sectionId: string) => sectionItems[sectionId] || [];
+
   return (
     <AppShell 
         navContent={SidebarContent} 
-        navTitle="Knowledge Buckets"
+        navTitle="Project Brief"
         statusContent={
             <SummaryCard 
-                title="Discovery Status"
-                status="Seeded from the project summary. Next: capture evidence and open questions."
-                done={[]}
-                undone={["Add first evidence bucket"]}
-                nextSteps={["Add sources", "Log assumptions"]}
+                title="Brief Status"
+                status={summaryStatus}
+                done={summaryDone}
+                undone={summaryUndone}
+                nextSteps={summaryNextSteps}
             />
         }
         chatContent={
-            <ChatWorkspace
-                messages={messages}
-                onSendMessage={(content) => {
-                  const userMsg: Message = {
-                    id: Date.now().toString(),
-                    role: "user",
-                    content,
-                    timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                  };
-                  setMessages(prev => [...prev, userMsg]);
-
-                  api.messages.create({
-                    parentId: activeProject.id,
-                    parentType: "lab_page",
-                    role: "user",
-                    content: prependContext("lab_page", content),
-                    timestamp: userMsg.timestamp,
-                  }).catch(() => {});
-                }}
-                saveDestinations={buckets.map((b) => ({ id: b.id, label: b.name }))}
+            <ChatWorkspace 
+                messages={messages} 
+                onSendMessage={handleSendMessage}
+                saveDestinations={sections.map((s) => ({ id: s.id, label: s.genericName }))}
                 onSaveContent={(messageId, destinationId) => {
                     const msg = messages.find((m) => m.id === messageId);
                     if (!msg) return;
 
                     setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, saved: true } : m)));
 
-                    api.messages.update(messageId, { saved: true }).catch(() => {});
-
                     const noteTitle = msg.content.split("\n")[0]?.slice(0, 80) || "Saved chat";
                     const noteBody = msg.content;
 
-                    addBucketItem(destinationId, {
+                    addSectionItem(destinationId, {
                         id: `chat-${Date.now()}`,
                         type: 'note',
                         title: noteTitle,
@@ -336,28 +428,36 @@ export default function LabPage() {
             />
         }
     >
-         <div className="bg-background h-full">
-             <ScrollArea className="h-full">
+        {/* Bottom: All Brief Sections */}
+        <div className="bg-background h-full">
+            <ScrollArea className="h-full">
                 <div className="flex flex-col gap-3 p-3">
-                    {buckets.map((bucket, index) => (
-                        <div key={bucket.id} ref={el => { if (el) bucketRefs.current[bucket.id] = el; }} className={`bg-background rounded-lg shadow-sm border border-border/40 border-t-[3px] ${ACCENT_COLORS[index % ACCENT_COLORS.length]}`}>
+                    {sections.map((section, index) => {
+                        const items = getSectionItemsList(section.id);
+                        return (
+                        <div key={section.id} ref={el => { if (el) sectionRefs.current[section.id] = el; }} className={`bg-background rounded-lg shadow-sm border border-border/40 border-t-[3px] ${ACCENT_COLORS[index % ACCENT_COLORS.length]}`}>
                             <div 
-                                className="flex items-center px-6 py-3 cursor-pointer hover:bg-muted/5 transition-colors group"
-                                onClick={() => toggleBucket(bucket.id)}
+                                className="flex items-center justify-between px-6 py-3 cursor-pointer hover:bg-muted/5 transition-colors group"
+                                onClick={() => toggleSection(section.id)}
                             >
-                                <div className={cn("text-muted-foreground transition-transform duration-200 mr-2", bucket.isOpen ? "rotate-90" : "")}>
-                                    <ChevronRight className="w-4 h-4" />
-                                </div>
-                                <h2 className="text-sm font-bold font-heading text-foreground flex-1">
-                                    {bucket.name}
-                                </h2>
                                 <div className="flex items-center gap-2">
-                                    <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden" data-testid={`progress-${bucket.id}`}>
-                                        <div
-                                            className="h-full bg-primary/80"
+                                    <div className={cn("text-muted-foreground transition-transform duration-200", section.isOpen ? "rotate-90" : "")}>
+                                        <ChevronRight className="w-4 h-4" />
+                                    </div>
+                                    <h2 className="text-sm font-bold text-foreground font-heading">{section.genericName}</h2>
+                                    <span className="text-sm text-muted-foreground font-normal px-2">—</span>
+                                    <span className="text-sm text-muted-foreground">{section.subtitle}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden" data-testid={`progress-${section.id}`}>
+                                        <div 
+                                            className="h-full bg-primary/80" 
                                             style={{
                                                 width: `${getBucketProgressPercent({
-                                                    itemsCount: bucket.items.length,
+                                                    explicitPercent: section.completeness,
+                                                    completedItems: section.completedItems,
+                                                    totalItems: section.totalItems,
+                                                    itemsCount: items.length,
                                                 })}%`,
                                             }}
                                         />
@@ -365,15 +465,15 @@ export default function LabPage() {
 
                                     <div className="flex items-center gap-1">
                                         <button
-                                            data-testid={`button-note-${bucket.id}`}
+                                            data-testid={`button-note-${section.id}`}
                                             className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                const title = window.prompt(`New note in "${bucket.name}"`, "Quick note");
+                                                const title = window.prompt(`New note in "${section.genericName}"`, "Quick note");
                                                 if (!title) return;
                                                 const content = window.prompt("Note text", "");
 
-                                                addBucketItem(bucket.id, {
+                                                addSectionItem(section.id, {
                                                     id: `${Date.now()}`,
                                                     type: 'note',
                                                     title,
@@ -387,18 +487,17 @@ export default function LabPage() {
                                         >
                                             <StickyNote className="w-3.5 h-3.5" />
                                         </button>
-
                                         <input
-                                            ref={(el) => { fileInputRefs.current[bucket.id] = el; }}
+                                            ref={(el) => { fileInputRefs.current[section.id] = el; }}
                                             className="hidden"
-                                            data-testid={`input-file-${bucket.id}`}
+                                            data-testid={`input-file-${section.id}`}
                                             type="file"
                                             onClick={(e) => e.stopPropagation()}
                                             onChange={(e) => {
                                                 const file = e.currentTarget.files?.[0];
                                                 if (!file) return;
 
-                                                addBucketItem(bucket.id, {
+                                                addSectionItem(section.id, {
                                                     id: `${Date.now()}`,
                                                     type: 'file',
                                                     title: file.name,
@@ -413,11 +512,11 @@ export default function LabPage() {
                                         />
 
                                         <button
-                                            data-testid={`button-upload-${bucket.id}`}
+                                            data-testid={`button-upload-${section.id}`}
                                             className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                fileInputRefs.current[bucket.id]?.click();
+                                                fileInputRefs.current[section.id]?.click();
                                             }}
                                             aria-label="Upload a file"
                                             title="Upload a file"
@@ -425,9 +524,8 @@ export default function LabPage() {
                                         >
                                             <Upload className="w-3.5 h-3.5" />
                                         </button>
-
                                         <button
-                                            data-testid={`button-link-${bucket.id}`}
+                                            data-testid={`button-link-${section.id}`}
                                             className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -435,7 +533,7 @@ export default function LabPage() {
                                                 if (!url) return;
                                                 const title = window.prompt("Link name", url) || url;
 
-                                                addBucketItem(bucket.id, {
+                                                addSectionItem(section.id, {
                                                     id: `${Date.now()}`,
                                                     type: 'link',
                                                     title,
@@ -450,9 +548,8 @@ export default function LabPage() {
                                         >
                                             <Link2 className="w-3.5 h-3.5" />
                                         </button>
-
                                         <button
-                                            data-testid={`button-update-${bucket.id}`}
+                                            data-testid={`button-update-${section.id}`}
                                             className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                                             onClick={(e) => { e.stopPropagation(); }}
                                             aria-label="Update bucket"
@@ -466,7 +563,7 @@ export default function LabPage() {
                             </div>
                             
                             <AnimatePresence initial={false}>
-                                {bucket.isOpen && (
+                                {section.isOpen && (
                                     <motion.div
                                         initial={{ height: 0, opacity: 0 }}
                                         animate={{ height: "auto", opacity: 1 }}
@@ -479,53 +576,54 @@ export default function LabPage() {
                                                 <div className="h-full flex flex-col">
                                                     <div className="flex-1 min-h-0">
                                                         <ChatWorkspace
-                                                            messages={(bucket.bucketMessages || []) as any}
+                                                            messages={(bucketMessages[section.id] || []) as any}
                                                             onSendMessage={(content) => {
+                                                                const timestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
                                                                 const userMsg: Message = {
                                                                     id: Date.now().toString(),
                                                                     role: "user",
                                                                     content,
-                                                                    timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                                                                    timestamp,
                                                                 };
 
                                                                 const contextLines = [
-                                                                    `Bucket: ${bucket.name}`,
+                                                                    `Brief Section: ${section.genericName}`,
+                                                                    section.subtitle ? `Subtitle: ${section.subtitle}` : null,
                                                                     "Attachments:",
-                                                                    ...((bucket.items || []).slice(0, 8).map((i) => `- [${i.type}] ${i.title}`)),
+                                                                    ...(items.slice(0, 8).map((i) => `- [${i.type}] ${i.title}`)),
                                                                 ].filter(Boolean);
 
+                                                                const aiTimestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
                                                                 const aiMsg: Message = {
                                                                     id: (Date.now() + 1).toString(),
                                                                     role: "ai",
-                                                                    content: `Got it. I'm only using this bucket's context:\n\n${contextLines.join("\n")}\n\nYou said: ${content}`,
-                                                                    timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                                                                    content: `Got it. I'm only using this section's context:\n\n${contextLines.join("\n")}\n\nYou said: ${content}`,
+                                                                    timestamp: aiTimestamp,
                                                                 };
 
-                                                                setBuckets((prev) =>
-                                                                    prev.map((b) =>
-                                                                        b.id === bucket.id
-                                                                            ? {
-                                                                                  ...b,
-                                                                                  bucketMessages: [...(b.bucketMessages || []), userMsg, aiMsg],
-                                                                              }
-                                                                            : b
-                                                                    )
-                                                                );
+                                                                setBucketMessages(prev => ({
+                                                                    ...prev,
+                                                                    [section.id]: [...(prev[section.id] || []), userMsg, aiMsg],
+                                                                }));
 
                                                                 api.messages.create({
-                                                                  parentId: bucket.id,
-                                                                  parentType: "lab_bucket",
+                                                                  parentId: section.id,
+                                                                  parentType: "brief_bucket",
                                                                   role: "user",
-                                                                  content: prependContext("lab_bucket", content),
-                                                                  timestamp: userMsg.timestamp,
+                                                                  content: prependContext("brief_bucket", content),
+                                                                  timestamp,
+                                                                  hasSaveableContent: false,
+                                                                  saved: false,
                                                                 }).catch(() => {});
 
                                                                 api.messages.create({
-                                                                  parentId: bucket.id,
-                                                                  parentType: "lab_bucket",
+                                                                  parentId: section.id,
+                                                                  parentType: "brief_bucket",
                                                                   role: "ai",
                                                                   content: aiMsg.content,
-                                                                  timestamp: aiMsg.timestamp,
+                                                                  timestamp: aiTimestamp,
+                                                                  hasSaveableContent: false,
+                                                                  saved: false,
                                                                 }).catch(() => {});
                                                             }}
                                                             className="h-full"
@@ -537,19 +635,19 @@ export default function LabPage() {
                                             {/* Right Attachments Column */}
                                             <div className="w-[20%] bg-muted/5 border-r border-border/50">
                                                 <div className="h-full flex flex-col">
-                                                    <div className="px-4 py-3 border-b border-border/50 text-[11px] uppercase tracking-wider text-muted-foreground" data-testid={`text-attachments-title-${bucket.id}`}>Memory</div>
+                                                    <div className="px-4 py-3 border-b border-border/50 text-[11px] uppercase tracking-wider text-muted-foreground" data-testid={`text-attachments-title-${section.id}`}>Memory</div>
                                                     <div className="flex-1 overflow-y-auto">
-                                                        {(bucket.items || []).length === 0 ? (
-                                                            <div className="px-4 py-3 text-sm text-muted-foreground" data-testid={`text-attachments-empty-${bucket.id}`}>No files, links, or notes yet.</div>
+                                                        {items.length === 0 ? (
+                                                            <div className="px-4 py-3 text-sm text-muted-foreground" data-testid={`text-attachments-empty-${section.id}`}>No files, links, or notes yet.</div>
                                                         ) : (
                                                             <div className="divide-y">
-                                                                {(bucket.items || []).map((item) => (
+                                                                {items.map((item) => (
                                                                     <div key={item.id} className="group flex items-start gap-3 px-4 py-3">
                                                                         <div className="mt-0.5 text-muted-foreground group-hover:text-primary transition-colors">
-                                                                            {(item.type === 'file' || item.type === 'doc') && <FileText className="w-4 h-4" />}
-                                                                            {item.type === 'link' && <LinkIcon className="w-4 h-4" />}
+                                                                            {(item.type === 'file' || item.type === 'doc') && <FileTextIcon className="w-4 h-4" />}
+                                                                            {item.type === 'link' && <Link2 className="w-4 h-4" />}
                                                                             {item.type === 'note' && <StickyNote className="w-4 h-4" />}
-                                                                            {item.type === 'chat' && <MessageSquare className="w-4 h-4" />}
+                                                                            {item.type === 'chat' && <ChevronDown className="w-4 h-4" />}
                                                                         </div>
                                                                         <div className="flex-1 min-w-0">
                                                                             <div className="flex items-center justify-between gap-3">
@@ -561,7 +659,7 @@ export default function LabPage() {
                                                                                         className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 opacity-0 group-hover:opacity-100 transition-opacity"
                                                                                         onClick={(e) => {
                                                                                             e.stopPropagation();
-                                                                                            deleteBucketItem(bucket.id, item.id);
+                                                                                            deleteSectionItem(section.id, item.id);
                                                                                         }}
                                                                                         aria-label="Delete item"
                                                                                         title="Delete item"
@@ -579,7 +677,7 @@ export default function LabPage() {
                                                     </div>
                                                 </div>
                                             </div>
-
+                                            
                                             {/* Right History Column */}
                                             <div className="w-[20%] bg-muted/5">
                                                 <ScopedHistory />
@@ -589,10 +687,17 @@ export default function LabPage() {
                                 )}
                             </AnimatePresence>
                         </div>
-                    ))}
+                        );
+                    })}
+                    
+                    <div className="p-8 text-center">
+                        <Button variant="outline" className="text-muted-foreground border-dashed">
+                            Add New Brief Section
+                        </Button>
+                    </div>
                 </div>
-             </ScrollArea>
-         </div>
+            </ScrollArea>
+        </div>
     </AppShell>
   );
 }

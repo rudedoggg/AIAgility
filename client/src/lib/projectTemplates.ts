@@ -10,7 +10,7 @@ type ProjectTemplate = {
     nextSteps: string[];
   };
   executiveSummary: string;
-  goals: {
+  brief: {
     navTitle: string;
     summary: {
       status: string;
@@ -20,7 +20,7 @@ type ProjectTemplate = {
     };
     sections: Section[];
   };
-  lab: {
+  discovery: {
     navTitle: string;
     summary: {
       status: string;
@@ -46,7 +46,7 @@ const baseMessages: Message[] = [
   {
     id: "1",
     role: "ai",
-    content: "I’m ready. What’s the decision or outcome you’re driving toward?",
+    content: "I'm ready. What's the decision or outcome you're driving toward?",
     timestamp: "10:00 AM",
   },
   {
@@ -59,7 +59,7 @@ const baseMessages: Message[] = [
     id: "3",
     role: "ai",
     content:
-      "Got it. I’ll help define goals, collect research, and produce deliverables. When I suggest content, you can save it to a specific bucket.",
+      "Got it. I'll help define the brief, collect research, and produce deliverables. When I suggest content, you can save it to a specific bucket.",
     timestamp: "10:02 AM",
     hasSaveableContent: true,
   },
@@ -72,9 +72,9 @@ function executiveSummaryFor(projectName: string) {
 Give me a two-page executive summary of this project.
 
 ## Summary (Draft)
-This project is currently in early structuring. The goal is to clarify scope, establish decision criteria, collect the right evidence, and produce decision-ready deliverables. The workspace is organized into Brief (what “good” looks like), Discovery (evidence and knowledge buckets), and Deliverables (outputs for stakeholders).
+This project is currently in early structuring. The goal is to clarify scope, establish decision criteria, collect the right evidence, and produce decision-ready deliverables. The workspace is organized into Brief (what "good" looks like), Discovery (evidence and knowledge buckets), and Deliverables (outputs for stakeholders).
 
-Over the next iterations, the main focus is to tighten the feedback loop between new evidence and updated deliverables. The system supports two layers of conversation: a global thread that can reference the entire page, and bucket-scoped threads that are constrained to the bucket’s attachments and local history.
+Over the next iterations, the main focus is to tighten the feedback loop between new evidence and updated deliverables. The system supports two layers of conversation: a global thread that can reference the entire page, and bucket-scoped threads that are constrained to the bucket's attachments and local history.
 
 ## Near-Term Next Steps
 1. Confirm objective and non-negotiable constraints.
@@ -93,7 +93,7 @@ export function getProjectTemplates() {
         nextSteps: ["Lock evaluation criteria", "Gather 3 location options"],
       },
       executiveSummary: executiveSummaryFor("Office Location Decision"),
-      goals: {
+      brief: {
         navTitle: "Project Brief",
         summary: {
           status: "Brief is partially defined. The objective is clear; constraints need numbers.",
@@ -153,7 +153,7 @@ export function getProjectTemplates() {
           },
         ],
       },
-      lab: {
+      discovery: {
         navTitle: "Knowledge Buckets",
         summary: {
           status: "Research phase active. Market context exists; team preferences need data.",
@@ -225,7 +225,7 @@ export function getProjectTemplates() {
         nextSteps: ["Run baseline model", "Document assumptions"],
       },
       executiveSummary: executiveSummaryFor("Commute Impact Study"),
-      goals: {
+      brief: {
         navTitle: "Project Brief",
         summary: {
           status: "Objective is defined as a model. Constraints are mostly technical/data-related.",
@@ -281,7 +281,7 @@ export function getProjectTemplates() {
           },
         ],
       },
-      lab: {
+      discovery: {
         navTitle: "Knowledge Buckets",
         summary: {
           status: "Evidence collection in progress. Data sources exist; joins/cleaning pending.",
@@ -350,7 +350,7 @@ export function getProjectTemplates() {
         nextSteps: ["Draft v1", "Run review"],
       },
       executiveSummary: executiveSummaryFor("Board Memo Draft"),
-      goals: {
+      brief: {
         navTitle: "Project Brief",
         summary: {
           status: "Goal is a strong narrative: decision, rationale, risks, and next steps.",
@@ -366,7 +366,7 @@ export function getProjectTemplates() {
             completeness: 55,
             totalItems: 6,
             completedItems: 3,
-            content: "We need a crisp narrative that’s decision-ready and defensible.",
+            content: "We need a crisp narrative that's decision-ready and defensible.",
             items: [{ id: "p3-g-1", type: "note", title: "Board expectations", preview: "", date: "Feb 10" }],
             isOpen: true,
           },
@@ -405,7 +405,7 @@ export function getProjectTemplates() {
           },
         ],
       },
-      lab: {
+      discovery: {
         navTitle: "Knowledge Buckets",
         summary: {
           status: "Inputs exist, but need consolidation into a clean appendix.",

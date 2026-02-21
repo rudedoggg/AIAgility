@@ -146,25 +146,25 @@ export function Header() {
       });
 
       if (template) {
-        for (const goal of template.goals) {
-          const { items, ...goalData } = goal;
-          const createdGoal = await api.goals.create(project.id, goalData);
+        for (const section of template.brief) {
+          const { items, ...sectionData } = section;
+          const createdSection = await api.brief.create(project.id, sectionData);
           for (const item of items) {
             await api.items.create({
-              parentId: createdGoal.id,
-              parentType: "goal",
+              parentId: createdSection.id,
+              parentType: "brief",
               ...item,
             });
           }
         }
 
-        for (const bucket of template.lab) {
+        for (const bucket of template.discovery) {
           const { items, ...bucketData } = bucket;
-          const createdBucket = await api.lab.create(project.id, bucketData);
+          const createdBucket = await api.discovery.create(project.id, bucketData);
           for (const item of items) {
             await api.items.create({
               parentId: createdBucket.id,
-              parentType: "lab",
+              parentType: "discovery",
               ...item,
             });
           }
@@ -182,7 +182,7 @@ export function Header() {
           }
         }
 
-        const pageTypes = ["dashboard", "goals", "lab", "deliverables"];
+        const pageTypes = ["dashboard", "brief", "discovery", "deliverables"];
         for (const pageType of pageTypes) {
           await api.messages.create({
             parentId: project.id,
@@ -212,7 +212,7 @@ export function Header() {
   const navItems = [
     { label: "Dashboard", path: "/dashboard" },
     { label: "Brief", path: "/" },
-    { label: "Discovery", path: "/lab" },
+    { label: "Discovery", path: "/discovery" },
     { label: "Deliverables", path: "/deliverables" },
   ];
 

@@ -1,10 +1,10 @@
 import { eq, asc, and } from "drizzle-orm";
 import { db } from "./db";
 import {
-  projects, goalSections, labBuckets, deliverables, bucketItems, chatMessages, coreQueries,
+  projects, briefSections, discoveryBuckets, deliverables, bucketItems, chatMessages, coreQueries,
   type InsertProject, type Project,
-  type InsertGoalSection, type GoalSection,
-  type InsertLabBucket, type LabBucket,
+  type InsertBriefSection, type BriefSection,
+  type InsertDiscoveryBucket, type DiscoveryBucket,
   type InsertDeliverable, type Deliverable,
   type InsertBucketItem, type BucketItem,
   type InsertChatMessage, type ChatMessage,
@@ -19,19 +19,19 @@ export interface IStorage {
   deleteProject(id: string): Promise<void>;
   listAllProjects(): Promise<Project[]>;
 
-  listGoalSections(projectId: string): Promise<GoalSection[]>;
-  getGoalSection(id: string): Promise<GoalSection | undefined>;
-  createGoalSection(data: InsertGoalSection): Promise<GoalSection>;
-  updateGoalSection(id: string, data: Partial<InsertGoalSection>): Promise<GoalSection | undefined>;
-  deleteGoalSection(id: string): Promise<void>;
-  reorderGoalSections(projectId: string, ids: string[]): Promise<void>;
+  listBriefSections(projectId: string): Promise<BriefSection[]>;
+  getBriefSection(id: string): Promise<BriefSection | undefined>;
+  createBriefSection(data: InsertBriefSection): Promise<BriefSection>;
+  updateBriefSection(id: string, data: Partial<InsertBriefSection>): Promise<BriefSection | undefined>;
+  deleteBriefSection(id: string): Promise<void>;
+  reorderBriefSections(projectId: string, ids: string[]): Promise<void>;
 
-  listLabBuckets(projectId: string): Promise<LabBucket[]>;
-  getLabBucket(id: string): Promise<LabBucket | undefined>;
-  createLabBucket(data: InsertLabBucket): Promise<LabBucket>;
-  updateLabBucket(id: string, data: Partial<InsertLabBucket>): Promise<LabBucket | undefined>;
-  deleteLabBucket(id: string): Promise<void>;
-  reorderLabBuckets(projectId: string, ids: string[]): Promise<void>;
+  listDiscoveryBuckets(projectId: string): Promise<DiscoveryBucket[]>;
+  getDiscoveryBucket(id: string): Promise<DiscoveryBucket | undefined>;
+  createDiscoveryBucket(data: InsertDiscoveryBucket): Promise<DiscoveryBucket>;
+  updateDiscoveryBucket(id: string, data: Partial<InsertDiscoveryBucket>): Promise<DiscoveryBucket | undefined>;
+  deleteDiscoveryBucket(id: string): Promise<void>;
+  reorderDiscoveryBuckets(projectId: string, ids: string[]): Promise<void>;
 
   listDeliverables(projectId: string): Promise<Deliverable[]>;
   getDeliverable(id: string): Promise<Deliverable | undefined>;
@@ -48,8 +48,8 @@ export interface IStorage {
   createChatMessage(data: InsertChatMessage): Promise<ChatMessage>;
   updateChatMessage(id: string, data: Partial<InsertChatMessage>): Promise<ChatMessage | undefined>;
 
-  getProjectIdForGoal(goalId: string): Promise<string | undefined>;
-  getProjectIdForLabBucket(bucketId: string): Promise<string | undefined>;
+  getProjectIdForBrief(briefId: string): Promise<string | undefined>;
+  getProjectIdForDiscoveryBucket(bucketId: string): Promise<string | undefined>;
   getProjectIdForDeliverable(deliverableId: string): Promise<string | undefined>;
 
   listCoreQueries(): Promise<CoreQuery[]>;
@@ -88,61 +88,61 @@ export class DatabaseStorage implements IStorage {
     await db.delete(projects).where(eq(projects.id, id));
   }
 
-  async listGoalSections(projectId: string): Promise<GoalSection[]> {
-    return db.select().from(goalSections).where(eq(goalSections.projectId, projectId)).orderBy(asc(goalSections.sortOrder));
+  async listBriefSections(projectId: string): Promise<BriefSection[]> {
+    return db.select().from(briefSections).where(eq(briefSections.projectId, projectId)).orderBy(asc(briefSections.sortOrder));
   }
 
-  async getGoalSection(id: string): Promise<GoalSection | undefined> {
-    const [row] = await db.select().from(goalSections).where(eq(goalSections.id, id));
+  async getBriefSection(id: string): Promise<BriefSection | undefined> {
+    const [row] = await db.select().from(briefSections).where(eq(briefSections.id, id));
     return row;
   }
 
-  async createGoalSection(data: InsertGoalSection): Promise<GoalSection> {
-    const [row] = await db.insert(goalSections).values(data).returning();
+  async createBriefSection(data: InsertBriefSection): Promise<BriefSection> {
+    const [row] = await db.insert(briefSections).values(data).returning();
     return row;
   }
 
-  async updateGoalSection(id: string, data: Partial<InsertGoalSection>): Promise<GoalSection | undefined> {
-    const [row] = await db.update(goalSections).set(data).where(eq(goalSections.id, id)).returning();
+  async updateBriefSection(id: string, data: Partial<InsertBriefSection>): Promise<BriefSection | undefined> {
+    const [row] = await db.update(briefSections).set(data).where(eq(briefSections.id, id)).returning();
     return row;
   }
 
-  async deleteGoalSection(id: string): Promise<void> {
-    await db.delete(goalSections).where(eq(goalSections.id, id));
+  async deleteBriefSection(id: string): Promise<void> {
+    await db.delete(briefSections).where(eq(briefSections.id, id));
   }
 
-  async reorderGoalSections(projectId: string, ids: string[]): Promise<void> {
+  async reorderBriefSections(projectId: string, ids: string[]): Promise<void> {
     for (let i = 0; i < ids.length; i++) {
-      await db.update(goalSections).set({ sortOrder: i }).where(and(eq(goalSections.id, ids[i]), eq(goalSections.projectId, projectId)));
+      await db.update(briefSections).set({ sortOrder: i }).where(and(eq(briefSections.id, ids[i]), eq(briefSections.projectId, projectId)));
     }
   }
 
-  async listLabBuckets(projectId: string): Promise<LabBucket[]> {
-    return db.select().from(labBuckets).where(eq(labBuckets.projectId, projectId)).orderBy(asc(labBuckets.sortOrder));
+  async listDiscoveryBuckets(projectId: string): Promise<DiscoveryBucket[]> {
+    return db.select().from(discoveryBuckets).where(eq(discoveryBuckets.projectId, projectId)).orderBy(asc(discoveryBuckets.sortOrder));
   }
 
-  async getLabBucket(id: string): Promise<LabBucket | undefined> {
-    const [row] = await db.select().from(labBuckets).where(eq(labBuckets.id, id));
+  async getDiscoveryBucket(id: string): Promise<DiscoveryBucket | undefined> {
+    const [row] = await db.select().from(discoveryBuckets).where(eq(discoveryBuckets.id, id));
     return row;
   }
 
-  async createLabBucket(data: InsertLabBucket): Promise<LabBucket> {
-    const [row] = await db.insert(labBuckets).values(data).returning();
+  async createDiscoveryBucket(data: InsertDiscoveryBucket): Promise<DiscoveryBucket> {
+    const [row] = await db.insert(discoveryBuckets).values(data).returning();
     return row;
   }
 
-  async updateLabBucket(id: string, data: Partial<InsertLabBucket>): Promise<LabBucket | undefined> {
-    const [row] = await db.update(labBuckets).set(data).where(eq(labBuckets.id, id)).returning();
+  async updateDiscoveryBucket(id: string, data: Partial<InsertDiscoveryBucket>): Promise<DiscoveryBucket | undefined> {
+    const [row] = await db.update(discoveryBuckets).set(data).where(eq(discoveryBuckets.id, id)).returning();
     return row;
   }
 
-  async deleteLabBucket(id: string): Promise<void> {
-    await db.delete(labBuckets).where(eq(labBuckets.id, id));
+  async deleteDiscoveryBucket(id: string): Promise<void> {
+    await db.delete(discoveryBuckets).where(eq(discoveryBuckets.id, id));
   }
 
-  async reorderLabBuckets(projectId: string, ids: string[]): Promise<void> {
+  async reorderDiscoveryBuckets(projectId: string, ids: string[]): Promise<void> {
     for (let i = 0; i < ids.length; i++) {
-      await db.update(labBuckets).set({ sortOrder: i }).where(and(eq(labBuckets.id, ids[i]), eq(labBuckets.projectId, projectId)));
+      await db.update(discoveryBuckets).set({ sortOrder: i }).where(and(eq(discoveryBuckets.id, ids[i]), eq(discoveryBuckets.projectId, projectId)));
     }
   }
 
@@ -206,13 +206,13 @@ export class DatabaseStorage implements IStorage {
     return row;
   }
 
-  async getProjectIdForGoal(goalId: string): Promise<string | undefined> {
-    const [row] = await db.select({ projectId: goalSections.projectId }).from(goalSections).where(eq(goalSections.id, goalId));
+  async getProjectIdForBrief(briefId: string): Promise<string | undefined> {
+    const [row] = await db.select({ projectId: briefSections.projectId }).from(briefSections).where(eq(briefSections.id, briefId));
     return row?.projectId;
   }
 
-  async getProjectIdForLabBucket(bucketId: string): Promise<string | undefined> {
-    const [row] = await db.select({ projectId: labBuckets.projectId }).from(labBuckets).where(eq(labBuckets.id, bucketId));
+  async getProjectIdForDiscoveryBucket(bucketId: string): Promise<string | undefined> {
+    const [row] = await db.select({ projectId: discoveryBuckets.projectId }).from(discoveryBuckets).where(eq(discoveryBuckets.id, bucketId));
     return row?.projectId;
   }
 

@@ -72,81 +72,81 @@ export async function registerRoutes(
     res.status(204).end();
   });
 
-  // === GOAL SECTIONS ===
-  app.get("/api/projects/:projectId/goals", isAuthenticated, async (req, res) => {
+  // === BRIEF SECTIONS ===
+  app.get("/api/projects/:projectId/brief", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
     if (!await verifyProjectOwnership(param(req, "projectId"), userId)) return res.status(404).json({ message: "Not found" });
-    const rows = await storage.listGoalSections(param(req, "projectId"));
+    const rows = await storage.listBriefSections(param(req, "projectId"));
     res.json(rows);
   });
 
-  app.post("/api/projects/:projectId/goals", isAuthenticated, async (req, res) => {
+  app.post("/api/projects/:projectId/brief", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
     if (!await verifyProjectOwnership(param(req, "projectId"), userId)) return res.status(404).json({ message: "Not found" });
-    const row = await storage.createGoalSection({ ...req.body, projectId: param(req, "projectId") });
+    const row = await storage.createBriefSection({ ...req.body, projectId: param(req, "projectId") });
     res.status(201).json(row);
   });
 
-  app.patch("/api/goals/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/brief/:id", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
-    const projectId = await storage.getProjectIdForGoal(param(req, "id"));
+    const projectId = await storage.getProjectIdForBrief(param(req, "id"));
     if (!projectId || !await verifyProjectOwnership(projectId, userId)) return res.status(404).json({ message: "Not found" });
-    const row = await storage.updateGoalSection(param(req, "id"), req.body);
+    const row = await storage.updateBriefSection(param(req, "id"), req.body);
     if (!row) return res.status(404).json({ message: "Not found" });
     res.json(row);
   });
 
-  app.delete("/api/goals/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/brief/:id", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
-    const projectId = await storage.getProjectIdForGoal(param(req, "id"));
+    const projectId = await storage.getProjectIdForBrief(param(req, "id"));
     if (!projectId || !await verifyProjectOwnership(projectId, userId)) return res.status(404).json({ message: "Not found" });
-    await storage.deleteGoalSection(param(req, "id"));
+    await storage.deleteBriefSection(param(req, "id"));
     res.status(204).end();
   });
 
-  app.put("/api/projects/:projectId/goals/reorder", isAuthenticated, async (req, res) => {
+  app.put("/api/projects/:projectId/brief/reorder", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
     if (!await verifyProjectOwnership(param(req, "projectId"), userId)) return res.status(404).json({ message: "Not found" });
-    await storage.reorderGoalSections(param(req, "projectId"), req.body.ids);
+    await storage.reorderBriefSections(param(req, "projectId"), req.body.ids);
     res.status(204).end();
   });
 
-  // === LAB BUCKETS ===
-  app.get("/api/projects/:projectId/lab", isAuthenticated, async (req, res) => {
+  // === DISCOVERY BUCKETS ===
+  app.get("/api/projects/:projectId/discovery", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
     if (!await verifyProjectOwnership(param(req, "projectId"), userId)) return res.status(404).json({ message: "Not found" });
-    const rows = await storage.listLabBuckets(param(req, "projectId"));
+    const rows = await storage.listDiscoveryBuckets(param(req, "projectId"));
     res.json(rows);
   });
 
-  app.post("/api/projects/:projectId/lab", isAuthenticated, async (req, res) => {
+  app.post("/api/projects/:projectId/discovery", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
     if (!await verifyProjectOwnership(param(req, "projectId"), userId)) return res.status(404).json({ message: "Not found" });
-    const row = await storage.createLabBucket({ ...req.body, projectId: param(req, "projectId") });
+    const row = await storage.createDiscoveryBucket({ ...req.body, projectId: param(req, "projectId") });
     res.status(201).json(row);
   });
 
-  app.patch("/api/lab/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/discovery/:id", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
-    const projectId = await storage.getProjectIdForLabBucket(param(req, "id"));
+    const projectId = await storage.getProjectIdForDiscoveryBucket(param(req, "id"));
     if (!projectId || !await verifyProjectOwnership(projectId, userId)) return res.status(404).json({ message: "Not found" });
-    const row = await storage.updateLabBucket(param(req, "id"), req.body);
+    const row = await storage.updateDiscoveryBucket(param(req, "id"), req.body);
     if (!row) return res.status(404).json({ message: "Not found" });
     res.json(row);
   });
 
-  app.delete("/api/lab/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/discovery/:id", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
-    const projectId = await storage.getProjectIdForLabBucket(param(req, "id"));
+    const projectId = await storage.getProjectIdForDiscoveryBucket(param(req, "id"));
     if (!projectId || !await verifyProjectOwnership(projectId, userId)) return res.status(404).json({ message: "Not found" });
-    await storage.deleteLabBucket(param(req, "id"));
+    await storage.deleteDiscoveryBucket(param(req, "id"));
     res.status(204).end();
   });
 
-  app.put("/api/projects/:projectId/lab/reorder", isAuthenticated, async (req, res) => {
+  app.put("/api/projects/:projectId/discovery/reorder", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
     if (!await verifyProjectOwnership(param(req, "projectId"), userId)) return res.status(404).json({ message: "Not found" });
-    await storage.reorderLabBuckets(param(req, "projectId"), req.body.ids);
+    await storage.reorderDiscoveryBuckets(param(req, "projectId"), req.body.ids);
     res.status(204).end();
   });
 

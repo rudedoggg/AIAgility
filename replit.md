@@ -14,11 +14,11 @@ A decision-making and project management tool with four main sections: Dashboard
 - `users` — id, email, firstName, lastName, profileImageUrl, isAdmin, createdAt, updatedAt (Replit Auth managed)
 - `sessions` — sid, sess (jsonb), expire (Replit Auth session storage)
 - `projects` — id, userId (FK to users), name, summary, executiveSummary, dashboardStatus (jsonb), createdAt
-- `goal_sections` — id, projectId (FK), genericName, subtitle, completeness, totalItems, completedItems, content, sortOrder
-- `lab_buckets` — id, projectId (FK), name, sortOrder
+- `brief_sections` — id, projectId (FK), genericName, subtitle, completeness, totalItems, completedItems, content, sortOrder
+- `discovery_buckets` — id, projectId (FK), name, sortOrder
 - `deliverables` — id, projectId (FK), title, subtitle, completeness, status, content, engaged, sortOrder
-- `bucket_items` — id, parentId, parentType (goal/lab/deliverable), type, title, preview, date, url, fileName, fileSizeLabel, sortOrder
-- `chat_messages` — id, parentId, parentType (goal_page/lab_page/deliverable_page/goal_bucket/lab_bucket/deliverable_bucket), role, content, timestamp, hasSaveableContent, saved, sortOrder
+- `bucket_items` — id, parentId, parentType (brief/discovery/deliverable), type, title, preview, date, url, fileName, fileSizeLabel, sortOrder
+- `chat_messages` — id, parentId, parentType (brief_page/discovery_page/deliverable_page/brief_bucket/discovery_bucket/deliverable_bucket/dashboard_page), role, content, timestamp, hasSaveableContent, saved, sortOrder
 
 ## Auth System
 - Replit Auth (OIDC) handles login/signup via /api/login and /api/logout
@@ -43,21 +43,30 @@ A decision-making and project management tool with four main sections: Dashboard
 - `client/src/lib/projectStore.ts` — Selected project state (localStorage for quick access)
 - `client/src/lib/queryClient.ts` — React Query client + apiRequest helper
 - `client/src/pages/LandingPage.tsx` — Public landing page for unauthenticated users
+- `client/src/pages/BriefPage.tsx` — Brief (formerly Goals) page
+- `client/src/pages/DiscoveryPage.tsx` — Discovery (formerly Lab) page
 - `client/src/pages/AdminPage.tsx` — Admin dashboard (users, projects, stats)
 
-## Recent Changes (Feb 18, 2026)
-- Reorganized Goals, Lab, Deliverables layout: status card moved to top-left (with scroll overflow), AI chat takes larger top-right, navigation moved to bottom-left beside buckets
+## Recent Changes (Feb 21, 2026)
+- Renamed "Goals" to "Brief" and "Lab" to "Discovery" everywhere — UI labels, internal variable names, database tables, API routes, file names
+- Database tables: goal_sections → brief_sections, lab_buckets → discovery_buckets
+- API routes: /api/projects/:id/goals → /api/projects/:id/brief, /api/goals/:id → /api/brief/:id, /api/projects/:id/lab → /api/projects/:id/discovery, /api/lab/:id → /api/discovery/:id
+- Files: GoalsPage.tsx → BriefPage.tsx, LabPage.tsx → DiscoveryPage.tsx
+- parentType values: goal → brief, lab → discovery, goal_page → brief_page, lab_page → discovery_page, goal_bucket → brief_bucket, lab_bucket → discovery_bucket
+- Location keys: brief_page, brief_bucket, discovery_page, discovery_bucket, deliverable_page, deliverable_bucket, dashboard_page
+
+## Previous Changes (Feb 18, 2026)
+- Reorganized Brief, Discovery, Deliverables layout: status card moved to top-left (with scroll overflow), AI chat takes larger top-right, navigation moved to bottom-left beside buckets
 - AppShell now accepts `statusContent` and `chatContent` props (replaced `topRightContent`)
 - Layout: top row = status (25%) + chat (75%), bottom row = nav (18%) + buckets (82%), all resizable
 - Added Dashboard AI chat with ChatWorkspace, message persistence (parentType: dashboard_page), and core query prepending
 - Dashboard redesigned with horizontal resizable split: left (status + executive summary), right (AI chat)
 - Added dashboard_page location to CoreQs admin page (7 total locations now)
-- Location keys: dashboard_page, goal_page, goal_bucket, lab_page, lab_bucket, deliverable_page, deliverable_bucket
 
 ## Previous Changes (Feb 17, 2026)
 - Added CoreQs admin page (/admin/coreqs) for managing AI context queries
-- `core_queries` table stores context queries per AI interaction location (6 locations)
-- Location keys: goal_page, goal_bucket, lab_page, lab_bucket, deliverable_page, deliverable_bucket
+- `core_queries` table stores context queries per AI interaction location
+- Location keys: brief_page, brief_bucket, discovery_page, discovery_bucket, deliverable_page, deliverable_bucket
 - Admin can set context queries that get prepended to user messages at each AI interaction point
 - API: GET /api/core-queries (all users), GET/PUT /api/admin/core-queries (admin only)
 - CoreQs menu item added to admin section of Header user dropdown

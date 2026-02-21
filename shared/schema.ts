@@ -20,7 +20,7 @@ export const projects = pgTable("projects", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const goalSections = pgTable("goal_sections", {
+export const briefSections = pgTable("brief_sections", {
   id: varchar("id", { length: 64 }).primaryKey().default(sql`gen_random_uuid()`),
   projectId: varchar("project_id", { length: 64 }).notNull().references(() => projects.id, { onDelete: "cascade" }),
   genericName: text("generic_name").notNull(),
@@ -32,7 +32,7 @@ export const goalSections = pgTable("goal_sections", {
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
-export const labBuckets = pgTable("lab_buckets", {
+export const discoveryBuckets = pgTable("discovery_buckets", {
   id: varchar("id", { length: 64 }).primaryKey().default(sql`gen_random_uuid()`),
   projectId: varchar("project_id", { length: 64 }).notNull().references(() => projects.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
@@ -85,18 +85,18 @@ export const coreQueries = pgTable("core_queries", {
 });
 
 export const insertProjectSchema = createInsertSchema(projects).omit({ id: true, createdAt: true });
-export const insertGoalSectionSchema = createInsertSchema(goalSections).omit({ id: true });
-export const insertLabBucketSchema = createInsertSchema(labBuckets).omit({ id: true });
+export const insertBriefSectionSchema = createInsertSchema(briefSections).omit({ id: true });
+export const insertDiscoveryBucketSchema = createInsertSchema(discoveryBuckets).omit({ id: true });
 export const insertDeliverableSchema = createInsertSchema(deliverables).omit({ id: true });
 export const insertBucketItemSchema = createInsertSchema(bucketItems).omit({ id: true });
 export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({ id: true });
 
 export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type Project = typeof projects.$inferSelect;
-export type InsertGoalSection = z.infer<typeof insertGoalSectionSchema>;
-export type GoalSection = typeof goalSections.$inferSelect;
-export type InsertLabBucket = z.infer<typeof insertLabBucketSchema>;
-export type LabBucket = typeof labBuckets.$inferSelect;
+export type InsertBriefSection = z.infer<typeof insertBriefSectionSchema>;
+export type BriefSection = typeof briefSections.$inferSelect;
+export type InsertDiscoveryBucket = z.infer<typeof insertDiscoveryBucketSchema>;
+export type DiscoveryBucket = typeof discoveryBuckets.$inferSelect;
 export type InsertDeliverable = z.infer<typeof insertDeliverableSchema>;
 export type Deliverable = typeof deliverables.$inferSelect;
 export type InsertBucketItem = z.infer<typeof insertBucketItemSchema>;
