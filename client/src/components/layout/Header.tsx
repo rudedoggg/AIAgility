@@ -166,7 +166,7 @@ export function Header() {
           for (const item of items) {
             await api.items.create({
               parentId: createdBucket.id,
-              parentType: "lab",
+              parentType: "labBucket",
               ...item,
             });
           }
@@ -184,7 +184,7 @@ export function Header() {
           }
         }
 
-        const pageTypes = ["dashboard", "goals", "lab", "deliverables"];
+        const pageTypes = ["dashboard_page", "goal_page", "lab_page", "deliverable_page"];
         for (const pageType of pageTypes) {
           await api.messages.create({
             parentId: project.id,
