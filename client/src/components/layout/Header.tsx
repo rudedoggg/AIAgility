@@ -20,9 +20,9 @@ function generateTemplateFromSnippet(projectName: string, snippet: string) {
       status: `Seeded from the project summary. Next: turn the narrative into explicit goals + constraints.`,
       done: ["Project seeded"],
       undone: ["Define objective", "List constraints"],
-      nextSteps: ["Create 3 goal sections", "Add stakeholders"],
+      nextSteps: ["Create 3 brief sections", "Add stakeholders"],
     },
-    goals: [
+    brief: [
       {
         genericName: "Context",
         subtitle: "What's happening and why now",
@@ -64,7 +64,7 @@ function generateTemplateFromSnippet(projectName: string, snippet: string) {
         items: [],
       },
     ],
-    lab: [
+    discovery: [
       {
         name: "Sources + Evidence",
         sortOrder: 0,
@@ -158,12 +158,12 @@ export function Header() {
           }
         }
 
-        for (const bucket of template.discovery) {
-          const { items, ...bucketData } = bucket;
-          const createdBucket = await api.discovery.create(project.id, bucketData);
+        for (const category of template.discovery) {
+          const { items, ...categoryData } = category;
+          const createdCategory = await api.discovery.create(project.id, categoryData);
           for (const item of items) {
             await api.items.create({
-              parentId: createdBucket.id,
+              parentId: createdCategory.id,
               parentType: "discovery",
               ...item,
             });

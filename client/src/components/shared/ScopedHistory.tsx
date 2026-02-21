@@ -18,7 +18,7 @@ interface ScopedHistoryProps {
 const defaultItems: HistoryItem[] = [
     { id: '1', action: "Updated content", user: "AI", timestamp: "2m ago", type: 'edit' },
     { id: '2', action: "Refined details", user: "JD", timestamp: "15m ago", type: 'edit' },
-    { id: '3', action: "Added to bucket", user: "JD", timestamp: "1h ago", type: 'add' },
+    { id: '3', action: "Added item", user: "JD", timestamp: "1h ago", type: 'add' },
     { id: '4', action: "Created section", user: "JD", timestamp: "2h ago", type: 'create' },
 ];
 

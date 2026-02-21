@@ -55,7 +55,7 @@ function getSectionIcon(id: string) {
     }
 }
 
-type LocalSection = Section & { bucketMessages?: Message[] };
+type LocalSection = Section & { sectionMessages?: Message[] };
 
 export default function BriefPage() {
   const queryClient = useQueryClient();
@@ -83,7 +83,7 @@ export default function BriefPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [sections, setSections] = useState<LocalSection[]>([]);
   const [sectionItems, setSectionItems] = useState<Record<string, ApiBucketItem[]>>({});
-  const [bucketMessages, setBucketMessages] = useState<Record<string, Message[]>>({});
+  const [sectionMessages, setSectionMessages] = useState<Record<string, Message[]>>({});
   const sectionRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -125,17 +125,17 @@ export default function BriefPage() {
             fileSizeLabel: i.fileSizeLabel || undefined,
           })),
           isOpen: openState[gs.id] || false,
-          bucketMessages: bucketMessages[gs.id] || [],
+          sectionMessages: sectionMessages[gs.id] || [],
         }));
       });
     }
-  }, [briefSections, sectionItems, bucketMessages]);
+  }, [briefSections, sectionItems, sectionMessages]);
 
   useEffect(() => {
     const unsub = subscribeToSelectedProject((p) => {
       setActiveProject(p);
       setSectionItems({});
-      setBucketMessages({});
+      setSectionMessages({});
     });
     return () => unsub();
   }, []);
@@ -149,11 +149,11 @@ export default function BriefPage() {
     }
   }, [sectionItems]);
 
-  const fetchBucketMessages = useCallback(async (sectionId: string) => {
-    if (bucketMessages[sectionId]) return;
+  const fetchSectionMessages = useCallback(async (sectionId: string) => {
+    if (sectionMessages[sectionId]) return;
     try {
-      const msgs = await api.messages.list("brief_bucket", sectionId);
-      setBucketMessages(prev => ({
+      const msgs = await api.messages.list("brief_section", sectionId);
+      setSectionMessages(prev => ({
         ...prev,
         [sectionId]: msgs.map(m => ({
           id: m.id,
@@ -166,7 +166,7 @@ export default function BriefPage() {
       }));
     } catch {
     }
-  }, [bucketMessages]);
+  }, [sectionMessages]);
 
   const handleSendMessage = async (content: string) => {
     const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -218,7 +218,7 @@ export default function BriefPage() {
           const willOpen = !s.isOpen;
           if (willOpen) {
             fetchSectionItems(id);
-            fetchBucketMessages(id);
+            fetchSectionMessages(id);
           }
           return { ...s, isOpen: willOpen };
         }
@@ -258,7 +258,7 @@ export default function BriefPage() {
       setSections(prev => prev.map(s => {
         if (s.id === id && !s.isOpen) {
           fetchSectionItems(id);
-          fetchBucketMessages(id);
+          fetchSectionMessages(id);
           return { ...s, isOpen: true };
         }
         return s;
@@ -335,7 +335,7 @@ export default function BriefPage() {
       content: "",
       items: [],
       isOpen: true,
-      bucketMessages: [],
+      sectionMessages: [],
     };
 
     setSections((prev) => [newSection, ...prev]);
@@ -376,7 +376,7 @@ export default function BriefPage() {
         </DndContext>
 
           <Button
-            data-testid="button-add-bucket"
+            data-testid="button-add-section"
             variant="ghost"
             size="sm"
             className="w-full justify-start px-3 mt-2 text-xs text-muted-foreground hover:text-primary"
@@ -392,7 +392,7 @@ export default function BriefPage() {
   return (
     <AppShell 
         navContent={SidebarContent} 
-        navTitle="Project Brief"
+        navTitle="Sections"
         statusContent={
             <SummaryCard 
                 title="Brief Status"
@@ -552,8 +552,8 @@ export default function BriefPage() {
                                             data-testid={`button-update-${section.id}`}
                                             className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                                             onClick={(e) => { e.stopPropagation(); }}
-                                            aria-label="Update bucket"
-                                            title="Update bucket"
+                                            aria-label="Update section"
+                                            title="Update section"
                                             type="button"
                                         >
                                             <RefreshCw className="w-3.5 h-3.5" />
@@ -576,7 +576,7 @@ export default function BriefPage() {
                                                 <div className="h-full flex flex-col">
                                                     <div className="flex-1 min-h-0">
                                                         <ChatWorkspace
-                                                            messages={(bucketMessages[section.id] || []) as any}
+                                                            messages={(sectionMessages[section.id] || []) as any}
                                                             onSendMessage={(content) => {
                                                                 const timestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
                                                                 const userMsg: Message = {
@@ -601,16 +601,16 @@ export default function BriefPage() {
                                                                     timestamp: aiTimestamp,
                                                                 };
 
-                                                                setBucketMessages(prev => ({
+                                                                setSectionMessages(prev => ({
                                                                     ...prev,
                                                                     [section.id]: [...(prev[section.id] || []), userMsg, aiMsg],
                                                                 }));
 
                                                                 api.messages.create({
                                                                   parentId: section.id,
-                                                                  parentType: "brief_bucket",
+                                                                  parentType: "brief_section",
                                                                   role: "user",
-                                                                  content: prependContext("brief_bucket", content),
+                                                                  content: prependContext("brief_section", content),
                                                                   timestamp,
                                                                   hasSaveableContent: false,
                                                                   saved: false,
@@ -618,7 +618,7 @@ export default function BriefPage() {
 
                                                                 api.messages.create({
                                                                   parentId: section.id,
-                                                                  parentType: "brief_bucket",
+                                                                  parentType: "brief_section",
                                                                   role: "ai",
                                                                   content: aiMsg.content,
                                                                   timestamp: aiTimestamp,

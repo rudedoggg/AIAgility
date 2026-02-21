@@ -85,7 +85,7 @@ export default function LandingPage() {
               <FeatureCard
                 icon={<Beaker className="w-5 h-5" />}
                 title="Discovery"
-                description="Organize evidence into knowledge buckets with notes, links, and files."
+                description="Organize evidence into categories with notes, links, and files."
                 testId="card-feature-lab"
               />
               <FeatureCard

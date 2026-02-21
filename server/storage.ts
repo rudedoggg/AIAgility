@@ -1,10 +1,10 @@
 import { eq, asc, and } from "drizzle-orm";
 import { db } from "./db";
 import {
-  projects, briefSections, discoveryBuckets, deliverables, bucketItems, chatMessages, coreQueries,
+  projects, briefSections, discoveryCategories, deliverables, bucketItems, chatMessages, coreQueries,
   type InsertProject, type Project,
   type InsertBriefSection, type BriefSection,
-  type InsertDiscoveryBucket, type DiscoveryBucket,
+  type InsertDiscoveryCategory, type DiscoveryCategory,
   type InsertDeliverable, type Deliverable,
   type InsertBucketItem, type BucketItem,
   type InsertChatMessage, type ChatMessage,
@@ -26,12 +26,12 @@ export interface IStorage {
   deleteBriefSection(id: string): Promise<void>;
   reorderBriefSections(projectId: string, ids: string[]): Promise<void>;
 
-  listDiscoveryBuckets(projectId: string): Promise<DiscoveryBucket[]>;
-  getDiscoveryBucket(id: string): Promise<DiscoveryBucket | undefined>;
-  createDiscoveryBucket(data: InsertDiscoveryBucket): Promise<DiscoveryBucket>;
-  updateDiscoveryBucket(id: string, data: Partial<InsertDiscoveryBucket>): Promise<DiscoveryBucket | undefined>;
-  deleteDiscoveryBucket(id: string): Promise<void>;
-  reorderDiscoveryBuckets(projectId: string, ids: string[]): Promise<void>;
+  listDiscoveryCategories(projectId: string): Promise<DiscoveryCategory[]>;
+  getDiscoveryCategory(id: string): Promise<DiscoveryCategory | undefined>;
+  createDiscoveryCategory(data: InsertDiscoveryCategory): Promise<DiscoveryCategory>;
+  updateDiscoveryCategory(id: string, data: Partial<InsertDiscoveryCategory>): Promise<DiscoveryCategory | undefined>;
+  deleteDiscoveryCategory(id: string): Promise<void>;
+  reorderDiscoveryCategories(projectId: string, ids: string[]): Promise<void>;
 
   listDeliverables(projectId: string): Promise<Deliverable[]>;
   getDeliverable(id: string): Promise<Deliverable | undefined>;
@@ -49,7 +49,7 @@ export interface IStorage {
   updateChatMessage(id: string, data: Partial<InsertChatMessage>): Promise<ChatMessage | undefined>;
 
   getProjectIdForBrief(briefId: string): Promise<string | undefined>;
-  getProjectIdForDiscoveryBucket(bucketId: string): Promise<string | undefined>;
+  getProjectIdForDiscoveryCategory(categoryId: string): Promise<string | undefined>;
   getProjectIdForDeliverable(deliverableId: string): Promise<string | undefined>;
 
   listCoreQueries(): Promise<CoreQuery[]>;
@@ -117,32 +117,32 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async listDiscoveryBuckets(projectId: string): Promise<DiscoveryBucket[]> {
-    return db.select().from(discoveryBuckets).where(eq(discoveryBuckets.projectId, projectId)).orderBy(asc(discoveryBuckets.sortOrder));
+  async listDiscoveryCategories(projectId: string): Promise<DiscoveryCategory[]> {
+    return db.select().from(discoveryCategories).where(eq(discoveryCategories.projectId, projectId)).orderBy(asc(discoveryCategories.sortOrder));
   }
 
-  async getDiscoveryBucket(id: string): Promise<DiscoveryBucket | undefined> {
-    const [row] = await db.select().from(discoveryBuckets).where(eq(discoveryBuckets.id, id));
+  async getDiscoveryCategory(id: string): Promise<DiscoveryCategory | undefined> {
+    const [row] = await db.select().from(discoveryCategories).where(eq(discoveryCategories.id, id));
     return row;
   }
 
-  async createDiscoveryBucket(data: InsertDiscoveryBucket): Promise<DiscoveryBucket> {
-    const [row] = await db.insert(discoveryBuckets).values(data).returning();
+  async createDiscoveryCategory(data: InsertDiscoveryCategory): Promise<DiscoveryCategory> {
+    const [row] = await db.insert(discoveryCategories).values(data).returning();
     return row;
   }
 
-  async updateDiscoveryBucket(id: string, data: Partial<InsertDiscoveryBucket>): Promise<DiscoveryBucket | undefined> {
-    const [row] = await db.update(discoveryBuckets).set(data).where(eq(discoveryBuckets.id, id)).returning();
+  async updateDiscoveryCategory(id: string, data: Partial<InsertDiscoveryCategory>): Promise<DiscoveryCategory | undefined> {
+    const [row] = await db.update(discoveryCategories).set(data).where(eq(discoveryCategories.id, id)).returning();
     return row;
   }
 
-  async deleteDiscoveryBucket(id: string): Promise<void> {
-    await db.delete(discoveryBuckets).where(eq(discoveryBuckets.id, id));
+  async deleteDiscoveryCategory(id: string): Promise<void> {
+    await db.delete(discoveryCategories).where(eq(discoveryCategories.id, id));
   }
 
-  async reorderDiscoveryBuckets(projectId: string, ids: string[]): Promise<void> {
+  async reorderDiscoveryCategories(projectId: string, ids: string[]): Promise<void> {
     for (let i = 0; i < ids.length; i++) {
-      await db.update(discoveryBuckets).set({ sortOrder: i }).where(and(eq(discoveryBuckets.id, ids[i]), eq(discoveryBuckets.projectId, projectId)));
+      await db.update(discoveryCategories).set({ sortOrder: i }).where(and(eq(discoveryCategories.id, ids[i]), eq(discoveryCategories.projectId, projectId)));
     }
   }
 
@@ -211,8 +211,8 @@ export class DatabaseStorage implements IStorage {
     return row?.projectId;
   }
 
-  async getProjectIdForDiscoveryBucket(bucketId: string): Promise<string | undefined> {
-    const [row] = await db.select({ projectId: discoveryBuckets.projectId }).from(discoveryBuckets).where(eq(discoveryBuckets.id, bucketId));
+  async getProjectIdForDiscoveryCategory(categoryId: string): Promise<string | undefined> {
+    const [row] = await db.select({ projectId: discoveryCategories.projectId }).from(discoveryCategories).where(eq(discoveryCategories.id, categoryId));
     return row?.projectId;
   }
 

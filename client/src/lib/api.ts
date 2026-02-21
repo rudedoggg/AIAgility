@@ -26,7 +26,7 @@ export type ApiBriefSection = {
   sortOrder: number;
 };
 
-export type ApiDiscoveryBucket = {
+export type ApiDiscoveryCategory = {
   id: string;
   projectId: string;
   name: string;
@@ -101,9 +101,9 @@ export const api = {
   },
 
   discovery: {
-    list: (projectId: string) => fetchJson<ApiDiscoveryBucket[]>(`/api/projects/${projectId}/discovery`),
-    create: (projectId: string, data: Partial<ApiDiscoveryBucket>) => apiRequest("POST", `/api/projects/${projectId}/discovery`, data).then(json<ApiDiscoveryBucket>),
-    update: (id: string, data: Partial<ApiDiscoveryBucket>) => apiRequest("PATCH", `/api/discovery/${id}`, data).then(json<ApiDiscoveryBucket>),
+    list: (projectId: string) => fetchJson<ApiDiscoveryCategory[]>(`/api/projects/${projectId}/discovery`),
+    create: (projectId: string, data: Partial<ApiDiscoveryCategory>) => apiRequest("POST", `/api/projects/${projectId}/discovery`, data).then(json<ApiDiscoveryCategory>),
+    update: (id: string, data: Partial<ApiDiscoveryCategory>) => apiRequest("PATCH", `/api/discovery/${id}`, data).then(json<ApiDiscoveryCategory>),
     delete: (id: string) => apiRequest("DELETE", `/api/discovery/${id}`),
     reorder: (projectId: string, ids: string[]) => apiRequest("PUT", `/api/projects/${projectId}/discovery/reorder`, { ids }),
   },

@@ -7,13 +7,13 @@ function executiveSummaryFor(name: string) {
 Give me a two-page executive summary of this project.
 
 ## Summary (Draft)
-This project is currently in early structuring. The goal is to clarify scope, establish decision criteria, collect the right evidence, and produce decision-ready deliverables. The workspace is organized into Brief (what "good" looks like), Discovery (evidence and knowledge buckets), and Deliverables (outputs for stakeholders).
+This project is currently in early structuring. The goal is to clarify scope, establish decision criteria, collect the right evidence, and produce decision-ready deliverables. The workspace is organized into Brief (sections defining what "good" looks like), Discovery (categories of evidence and knowledge), and Deliverables (assets for stakeholders).
 
 Over the next iterations, the main focus is to tighten the feedback loop between new evidence and updated deliverables.
 
 ## Near-Term Next Steps
 1. Confirm objective and non-negotiable constraints.
-2. Populate research buckets with the minimum viable evidence.
+2. Populate research categories with the minimum viable evidence.
 3. Produce a first-pass deliverable draft and iterate.
 `;
 }
@@ -52,7 +52,7 @@ export async function seedDemoData(userId?: string) {
   ];
   const createdP1Discovery = [];
   for (const l of p1Discovery) {
-    createdP1Discovery.push(await storage.createDiscoveryBucket({ ...l, projectId: p1.id }));
+    createdP1Discovery.push(await storage.createDiscoveryCategory({ ...l, projectId: p1.id }));
   }
 
   await storage.createBucketItem({ parentId: createdP1Discovery[0].id, parentType: "discovery", type: "doc", title: "CRE market snapshot", preview: "Market trends overview", date: "Feb 8", sortOrder: 0 });
@@ -98,8 +98,8 @@ export async function seedDemoData(userId?: string) {
     }
   }
 
-  const p2Disc1 = await storage.createDiscoveryBucket({ name: "Data Sources", sortOrder: 0, projectId: p2.id });
-  const p2Disc2 = await storage.createDiscoveryBucket({ name: "Assumptions + Methodology", sortOrder: 1, projectId: p2.id });
+  const p2Disc1 = await storage.createDiscoveryCategory({ name: "Data Sources", sortOrder: 0, projectId: p2.id });
+  const p2Disc2 = await storage.createDiscoveryCategory({ name: "Assumptions + Methodology", sortOrder: 1, projectId: p2.id });
   await storage.createBucketItem({ parentId: p2Disc1.id, parentType: "discovery", type: "file", title: "employees_hub.csv", preview: "312 KB", date: "Feb 9", fileName: "employees_hub.csv", fileSizeLabel: "312 KB", sortOrder: 0 });
   await storage.createBucketItem({ parentId: p2Disc1.id, parentType: "discovery", type: "link", title: "Transit API docs", preview: "https://example.com", date: "Feb 9", url: "https://example.com", sortOrder: 1 });
   await storage.createBucketItem({ parentId: p2Disc2.id, parentType: "discovery", type: "note", title: "Assumption log", preview: "Key assumptions documented", date: "Feb 10", sortOrder: 0 });
@@ -134,8 +134,8 @@ export async function seedDemoData(userId?: string) {
     }
   }
 
-  const p3Disc1 = await storage.createDiscoveryBucket({ name: "Evidence + Appendix", sortOrder: 0, projectId: p3.id });
-  const p3Disc2 = await storage.createDiscoveryBucket({ name: "Reviewer Feedback", sortOrder: 1, projectId: p3.id });
+  const p3Disc1 = await storage.createDiscoveryCategory({ name: "Evidence + Appendix", sortOrder: 0, projectId: p3.id });
+  const p3Disc2 = await storage.createDiscoveryCategory({ name: "Reviewer Feedback", sortOrder: 1, projectId: p3.id });
   await storage.createBucketItem({ parentId: p3Disc1.id, parentType: "discovery", type: "link", title: "Comp set", preview: "https://example.com", date: "Feb 11", url: "https://example.com", sortOrder: 0 });
   await storage.createBucketItem({ parentId: p3Disc1.id, parentType: "discovery", type: "note", title: "Edits to incorporate", preview: "Reviewer feedback notes", date: "Feb 10", sortOrder: 1 });
   await storage.createBucketItem({ parentId: p3Disc2.id, parentType: "discovery", type: "chat", title: "AI rewrite options", preview: "Alternative phrasings", date: "Feb 12", sortOrder: 0 });
@@ -147,7 +147,7 @@ export async function seedDemoData(userId?: string) {
   const baseMessages = [
     { role: "ai", content: "I'm ready. What's the decision or outcome you're driving toward?", timestamp: "10:00 AM", hasSaveableContent: false, saved: false, sortOrder: 0 },
     { role: "user", content: "Help me structure this project so we can move faster with fewer blind spots.", timestamp: "10:01 AM", hasSaveableContent: false, saved: false, sortOrder: 1 },
-    { role: "ai", content: "Got it. I'll help define the brief, collect research, and produce deliverables. When I suggest content, you can save it to a specific bucket.", timestamp: "10:02 AM", hasSaveableContent: true, saved: false, sortOrder: 2 },
+    { role: "ai", content: "Got it. I'll help define the brief, collect research, and produce deliverables. When I suggest content, you can save it to a specific section, category, or asset.", timestamp: "10:02 AM", hasSaveableContent: true, saved: false, sortOrder: 2 },
   ];
 
   for (const pid of [p1.id, p2.id, p3.id]) {

@@ -25,12 +25,12 @@ const LOCATIONS = [
     scope: "Page Chat",
   },
   {
-    key: "brief_bucket",
-    label: "Brief — Bucket-Level AI",
+    key: "brief_section",
+    label: "Brief — Section-Level AI",
     description: "This context is prepended to every user message inside any individual brief section's expandable chat.",
     icon: FolderOpen,
     page: "Brief",
-    scope: "Bucket Chat",
+    scope: "Section Chat",
   },
   {
     key: "discovery_page",
@@ -41,12 +41,12 @@ const LOCATIONS = [
     scope: "Page Chat",
   },
   {
-    key: "discovery_bucket",
-    label: "Discovery — Bucket-Level AI",
-    description: "This context is prepended to every user message inside any individual knowledge bucket's expandable chat.",
+    key: "discovery_category",
+    label: "Discovery — Category-Level AI",
+    description: "This context is prepended to every user message inside any individual discovery category's expandable chat.",
     icon: FolderOpen,
     page: "Discovery",
-    scope: "Bucket Chat",
+    scope: "Category Chat",
   },
   {
     key: "deliverable_page",
@@ -57,12 +57,12 @@ const LOCATIONS = [
     scope: "Page Chat",
   },
   {
-    key: "deliverable_bucket",
-    label: "Deliverables — Bucket-Level AI",
-    description: "This context is prepended to every user message inside any individual deliverable's expandable chat.",
+    key: "deliverable_asset",
+    label: "Deliverables — Asset-Level AI",
+    description: "This context is prepended to every user message inside any individual deliverable asset's expandable chat.",
     icon: FolderOpen,
     page: "Deliverables",
-    scope: "Bucket Chat",
+    scope: "Asset Chat",
   },
 ];
 

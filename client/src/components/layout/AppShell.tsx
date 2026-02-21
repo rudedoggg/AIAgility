@@ -39,7 +39,7 @@ export function AppShell({ children, navContent, navTitle, statusContent, chatCo
 
             <ResizableHandle className="bg-transparent hover:bg-border/50 transition-colors h-[3px]" />
 
-            {/* Bottom Section: Nav (left) & Buckets (right) */}
+            {/* Bottom Section: Nav (left) & Content (right) */}
             <ResizablePanel defaultSize={55}>
                 <ResizablePanelGroup direction="horizontal" className="h-full w-full gap-2">
                     <ResizablePanel defaultSize={18} minSize={12} maxSize={28} className="flex flex-col h-full">

@@ -42,7 +42,7 @@ const ACCENT_COLORS = [
   "border-t-orange-400",
 ];
 
-type LocalDeliverable = Deliverable & { isOpen?: boolean; bucketMessages?: Message[] };
+type LocalDeliverable = Deliverable & { isOpen?: boolean; assetMessages?: Message[] };
 
 export default function DeliverablesPage() {
   const queryClient = useQueryClient();
@@ -64,7 +64,7 @@ export default function DeliverablesPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [deliverables, setDeliverables] = useState<LocalDeliverable[]>([]);
   const [deliverableItems, setDeliverableItems] = useState<Record<string, ApiBucketItem[]>>({});
-  const [bucketMessages, setBucketMessages] = useState<Record<string, Message[]>>({});
+  const [assetMessages, setAssetMessages] = useState<Record<string, Message[]>>({});
   const deliverableRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -107,17 +107,17 @@ export default function DeliverablesPage() {
             fileSizeLabel: i.fileSizeLabel || undefined,
           })),
           isOpen: openState[ad.id] ?? true,
-          bucketMessages: bucketMessages[ad.id] || [],
+          assetMessages: assetMessages[ad.id] || [],
         }));
       });
     }
-  }, [apiDeliverables, deliverableItems, bucketMessages]);
+  }, [apiDeliverables, deliverableItems, assetMessages]);
 
   useEffect(() => {
     const unsub = subscribeToSelectedProject((p) => {
       setActiveProject(p);
       setDeliverableItems({});
-      setBucketMessages({});
+      setAssetMessages({});
     });
     return () => unsub();
   }, []);
@@ -131,11 +131,11 @@ export default function DeliverablesPage() {
     }
   }, [deliverableItems]);
 
-  const fetchBucketMessages = useCallback(async (deliverableId: string) => {
-    if (bucketMessages[deliverableId]) return;
+  const fetchAssetMessages = useCallback(async (deliverableId: string) => {
+    if (assetMessages[deliverableId]) return;
     try {
-      const msgs = await api.messages.list("deliverable_bucket", deliverableId);
-      setBucketMessages(prev => ({
+      const msgs = await api.messages.list("deliverable_asset", deliverableId);
+      setAssetMessages(prev => ({
         ...prev,
         [deliverableId]: msgs.map(m => ({
           id: m.id,
@@ -148,7 +148,7 @@ export default function DeliverablesPage() {
       }));
     } catch {
     }
-  }, [bucketMessages]);
+  }, [assetMessages]);
 
   const toggleDeliverable = (id: string) => {
     setDeliverables(prev => prev.map(d => 
@@ -157,7 +157,7 @@ export default function DeliverablesPage() {
     const doc = deliverables.find(d => d.id === id);
     if (doc && !doc.isOpen) {
       fetchDeliverableItems(id);
-      fetchBucketMessages(id);
+      fetchAssetMessages(id);
     }
   };
 
@@ -251,7 +251,7 @@ export default function DeliverablesPage() {
   const scrollToDeliverable = (id: string) => {
       setDeliverables(prev => prev.map(d => d.id === id ? { ...d, isOpen: true } : d));
       fetchDeliverableItems(id);
-      fetchBucketMessages(id);
+      fetchAssetMessages(id);
       setTimeout(() => {
           deliverableRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 50);
@@ -324,7 +324,7 @@ export default function DeliverablesPage() {
         </DndContext>
 
           <Button
-            data-testid="button-add-bucket"
+            data-testid="button-add-asset"
             variant="ghost"
             size="sm"
             className="w-full justify-start px-3 mt-2 text-xs text-muted-foreground hover:text-primary"
@@ -344,7 +344,7 @@ export default function DeliverablesPage() {
                 items: [],
                 engaged: false,
                 isOpen: true,
-                bucketMessages: [],
+                assetMessages: [],
               };
 
               setDeliverables((prev) => [newDeliverable, ...prev]);
@@ -373,7 +373,7 @@ export default function DeliverablesPage() {
   return (
     <AppShell 
         navContent={SidebarContent} 
-        navTitle="Deliverables"
+        navTitle="Assets"
         statusContent={
             <SummaryCard 
                 title="Deliverables Status"
@@ -428,9 +428,9 @@ export default function DeliverablesPage() {
                                 <div className="flex items-center gap-3 flex-1 min-w-0">
                                     <FileText className="w-4 h-4 text-primary shrink-0" />
                                     <div className="min-w-0">
-                                        <h2 className="text-sm font-bold font-heading text-foreground truncate" data-testid={`text-bucket-title-${doc.id}`}>{doc.title}</h2>
+                                        <h2 className="text-sm font-bold font-heading text-foreground truncate" data-testid={`text-asset-title-${doc.id}`}>{doc.title}</h2>
                                         {doc.subtitle ? (
-                                            <div className="text-xs text-muted-foreground truncate" data-testid={`text-bucket-subtitle-${doc.id}`}>{doc.subtitle}</div>
+                                            <div className="text-xs text-muted-foreground truncate" data-testid={`text-asset-subtitle-${doc.id}`}>{doc.subtitle}</div>
                                         ) : null}
                                     </div>
                                 </div>
@@ -538,8 +538,8 @@ export default function DeliverablesPage() {
                                             data-testid={`button-update-${doc.id}`}
                                             className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                                             onClick={(e) => { e.stopPropagation(); }}
-                                            aria-label="Update bucket"
-                                            title="Update bucket"
+                                            aria-label="Update asset"
+                                            title="Update asset"
                                             type="button"
                                         >
                                             <RefreshCw className="w-3.5 h-3.5" />
@@ -562,7 +562,7 @@ export default function DeliverablesPage() {
                                                 <div className="h-full flex flex-col">
                                                     <div className="flex-1 min-h-0">
                                                         <ChatWorkspace
-                                                            messages={((doc.bucketMessages || []) as any)}
+                                                            messages={((doc.assetMessages || []) as any)}
                                                             onSendMessage={(content) => {
                                                                 const userMsg = {
                                                                     id: Date.now().toString(),
@@ -581,7 +581,7 @@ export default function DeliverablesPage() {
                                                                     current ? `Current version: ${current.title}` : "Current version: (none yet)",
                                                                     "Deliverable versions:",
                                                                     ...versions.slice(0, 8).map((i: any) => `- [${i.type}] ${i.title}`),
-                                                                    "\nInstruction: This bucket chat is for editing the deliverable. Propose changes as a patch or a new version.",
+                                                                    "\nInstruction: This asset chat is for editing the deliverable. Propose changes as a patch or a new version.",
                                                                 ].filter(Boolean);
 
                                                                 const aiMsg = {
@@ -591,16 +591,16 @@ export default function DeliverablesPage() {
                                                                     timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
                                                                 };
 
-                                                                setBucketMessages(prev => ({
+                                                                setAssetMessages(prev => ({
                                                                     ...prev,
                                                                     [doc.id]: [...(prev[doc.id] || []), userMsg, aiMsg],
                                                                 }));
 
                                                                 api.messages.create({
                                                                     parentId: doc.id,
-                                                                    parentType: "deliverable_bucket",
+                                                                    parentType: "deliverable_asset",
                                                                     role: "user",
-                                                                    content: prependContext("deliverable_bucket", content),
+                                                                    content: prependContext("deliverable_asset", content),
                                                                     timestamp: userMsg.timestamp,
                                                                     hasSaveableContent: false,
                                                                     saved: false,
@@ -608,7 +608,7 @@ export default function DeliverablesPage() {
 
                                                                 api.messages.create({
                                                                     parentId: doc.id,
-                                                                    parentType: "deliverable_bucket",
+                                                                    parentType: "deliverable_asset",
                                                                     role: "ai",
                                                                     content: aiMsg.content,
                                                                     timestamp: aiMsg.timestamp,

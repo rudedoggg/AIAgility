@@ -111,42 +111,42 @@ export async function registerRoutes(
     res.status(204).end();
   });
 
-  // === DISCOVERY BUCKETS ===
+  // === DISCOVERY CATEGORIES ===
   app.get("/api/projects/:projectId/discovery", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
     if (!await verifyProjectOwnership(param(req, "projectId"), userId)) return res.status(404).json({ message: "Not found" });
-    const rows = await storage.listDiscoveryBuckets(param(req, "projectId"));
+    const rows = await storage.listDiscoveryCategories(param(req, "projectId"));
     res.json(rows);
   });
 
   app.post("/api/projects/:projectId/discovery", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
     if (!await verifyProjectOwnership(param(req, "projectId"), userId)) return res.status(404).json({ message: "Not found" });
-    const row = await storage.createDiscoveryBucket({ ...req.body, projectId: param(req, "projectId") });
+    const row = await storage.createDiscoveryCategory({ ...req.body, projectId: param(req, "projectId") });
     res.status(201).json(row);
   });
 
   app.patch("/api/discovery/:id", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
-    const projectId = await storage.getProjectIdForDiscoveryBucket(param(req, "id"));
+    const projectId = await storage.getProjectIdForDiscoveryCategory(param(req, "id"));
     if (!projectId || !await verifyProjectOwnership(projectId, userId)) return res.status(404).json({ message: "Not found" });
-    const row = await storage.updateDiscoveryBucket(param(req, "id"), req.body);
+    const row = await storage.updateDiscoveryCategory(param(req, "id"), req.body);
     if (!row) return res.status(404).json({ message: "Not found" });
     res.json(row);
   });
 
   app.delete("/api/discovery/:id", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
-    const projectId = await storage.getProjectIdForDiscoveryBucket(param(req, "id"));
+    const projectId = await storage.getProjectIdForDiscoveryCategory(param(req, "id"));
     if (!projectId || !await verifyProjectOwnership(projectId, userId)) return res.status(404).json({ message: "Not found" });
-    await storage.deleteDiscoveryBucket(param(req, "id"));
+    await storage.deleteDiscoveryCategory(param(req, "id"));
     res.status(204).end();
   });
 
   app.put("/api/projects/:projectId/discovery/reorder", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
     if (!await verifyProjectOwnership(param(req, "projectId"), userId)) return res.status(404).json({ message: "Not found" });
-    await storage.reorderDiscoveryBuckets(param(req, "projectId"), req.body.ids);
+    await storage.reorderDiscoveryCategories(param(req, "projectId"), req.body.ids);
     res.status(204).end();
   });
 

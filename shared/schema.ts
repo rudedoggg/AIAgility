@@ -32,7 +32,7 @@ export const briefSections = pgTable("brief_sections", {
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
-export const discoveryBuckets = pgTable("discovery_buckets", {
+export const discoveryCategories = pgTable("discovery_categories", {
   id: varchar("id", { length: 64 }).primaryKey().default(sql`gen_random_uuid()`),
   projectId: varchar("project_id", { length: 64 }).notNull().references(() => projects.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
@@ -86,7 +86,7 @@ export const coreQueries = pgTable("core_queries", {
 
 export const insertProjectSchema = createInsertSchema(projects).omit({ id: true, createdAt: true });
 export const insertBriefSectionSchema = createInsertSchema(briefSections).omit({ id: true });
-export const insertDiscoveryBucketSchema = createInsertSchema(discoveryBuckets).omit({ id: true });
+export const insertDiscoveryCategorySchema = createInsertSchema(discoveryCategories).omit({ id: true });
 export const insertDeliverableSchema = createInsertSchema(deliverables).omit({ id: true });
 export const insertBucketItemSchema = createInsertSchema(bucketItems).omit({ id: true });
 export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({ id: true });
@@ -95,8 +95,8 @@ export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type Project = typeof projects.$inferSelect;
 export type InsertBriefSection = z.infer<typeof insertBriefSectionSchema>;
 export type BriefSection = typeof briefSections.$inferSelect;
-export type InsertDiscoveryBucket = z.infer<typeof insertDiscoveryBucketSchema>;
-export type DiscoveryBucket = typeof discoveryBuckets.$inferSelect;
+export type InsertDiscoveryCategory = z.infer<typeof insertDiscoveryCategorySchema>;
+export type DiscoveryCategory = typeof discoveryCategories.$inferSelect;
 export type InsertDeliverable = z.infer<typeof insertDeliverableSchema>;
 export type Deliverable = typeof deliverables.$inferSelect;
 export type InsertBucketItem = z.infer<typeof insertBucketItemSchema>;

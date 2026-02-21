@@ -42,7 +42,7 @@ export default function HelpSupportPage() {
                 <li>How do projects work?</li>
                 <li>What is Memory?</li>
                 <li>How do I structure a decision?</li>
-                <li>How do bucket chats stay scoped?</li>
+                <li>How do scoped chats stay focused?</li>
               </ul>
             </Card>
             <Card className="p-5 space-y-2">

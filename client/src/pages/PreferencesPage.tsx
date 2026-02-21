@@ -27,7 +27,7 @@ export default function PreferencesPage() {
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0">
                 <div className="text-sm font-semibold" data-testid="text-pref-compact-title">Compact mode</div>
-                <div className="text-sm text-muted-foreground" data-testid="text-pref-compact-desc">Tighter spacing in buckets and sidebars.</div>
+                <div className="text-sm text-muted-foreground" data-testid="text-pref-compact-desc">Tighter spacing in sections, categories, and sidebars.</div>
               </div>
               <Switch data-testid="switch-compact-mode" />
             </div>
