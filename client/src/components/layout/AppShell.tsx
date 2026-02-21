@@ -12,7 +12,7 @@ interface AppShellProps {
 
 export function AppShell({ children, navContent, navTitle, statusContent, chatContent }: AppShellProps) {
   return (
-    <div className="h-screen w-screen bg-muted/60 text-foreground font-sans flex flex-col overflow-hidden">
+    <div className="h-screen w-screen bg-white text-foreground font-sans flex flex-col overflow-hidden">
       <Header />
       <div className="flex-1 pt-[60px] h-full overflow-hidden w-full">
          <ResizablePanelGroup direction="vertical" className="h-full w-full p-2 gap-2">
@@ -44,7 +44,7 @@ export function AppShell({ children, navContent, navTitle, statusContent, chatCo
                 <ResizablePanelGroup direction="horizontal" className="h-full w-full gap-2">
                     <ResizablePanel defaultSize={18} minSize={12} maxSize={28} className="flex flex-col h-full">
                         <div className="flex-1 flex flex-col min-h-0 bg-background rounded-lg shadow-sm border border-border/40 overflow-hidden">
-                            <div className="px-4 py-3 border-b bg-muted/20 h-[40px] flex items-center shrink-0">
+                            <div className="px-4 py-3 border-b bg-white h-[40px] flex items-center shrink-0">
                                 <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{navTitle || "Navigation"}</h2>
                             </div>
                             <ScrollArea className="flex-1">

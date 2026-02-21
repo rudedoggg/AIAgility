@@ -217,7 +217,7 @@ export function Header() {
   ];
 
   return (
-    <header className="h-[60px] border-b bg-background flex items-center justify-between px-6 fixed top-0 w-full z-50">
+    <header className="h-[60px] border-b bg-white flex items-center justify-between px-6 fixed top-0 w-full z-50">
       <div className="flex items-center gap-3 font-bold text-lg tracking-tight font-heading">
         <div className="w-8 h-8 bg-primary rounded-md flex items-center justify-center text-primary-foreground" data-testid="img-app-mark">
           A

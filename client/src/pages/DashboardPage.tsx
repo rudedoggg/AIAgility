@@ -122,7 +122,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="h-screen w-screen bg-muted/60 text-foreground font-sans flex flex-col overflow-hidden">
+    <div className="h-screen w-screen bg-white text-foreground font-sans flex flex-col overflow-hidden">
       <Header />
       <div className="flex-1 pt-[60px] h-full overflow-hidden w-full">
         <div className="h-full w-full p-2">
