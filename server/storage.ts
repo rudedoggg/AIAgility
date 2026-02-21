@@ -237,9 +237,13 @@ export class DatabaseStorage implements IStorage {
   async getProjectIdForParent(parentId: string, parentType: string): Promise<string | undefined> {
     switch (parentType) {
       case "dashboard":
+      case "dashboard_page":
       case "goals":
+      case "goal_page":
       case "lab":
-      case "deliverables": {
+      case "lab_page":
+      case "deliverables":
+      case "deliverable_page": {
         const project = await this.getProject(parentId);
         return project?.id;
       }
