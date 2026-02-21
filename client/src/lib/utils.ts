@@ -10,7 +10,7 @@ export function clampPercent(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
-export function getBucketProgressPercent(args: {
+export function getProgressPercent(args: {
   itemsCount?: number;
   completedItems?: number;
   totalItems?: number;

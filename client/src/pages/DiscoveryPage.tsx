@@ -21,7 +21,7 @@ import { ChatWorkspace } from "@/components/shared/ChatWorkspace";
 import { getSelectedProject, subscribeToSelectedProject } from "@/lib/projectStore";
 import { Message, Category } from "@/lib/types";
 import { FileText, Link as LinkIcon, MessageSquare, StickyNote, FolderOpen, Folder, Plus, ChevronRight, Upload, Link2, RefreshCw, Trash2 } from "lucide-react";
-import { cn, getBucketProgressPercent } from "@/lib/utils";
+import { cn, getProgressPercent } from "@/lib/utils";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -356,7 +356,7 @@ export default function DiscoveryPage() {
                                         <div
                                             className="h-full bg-primary/80"
                                             style={{
-                                                width: `${getBucketProgressPercent({
+                                                width: `${getProgressPercent({
                                                     itemsCount: category.items.length,
                                                 })}%`,
                                             }}

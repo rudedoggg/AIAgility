@@ -21,7 +21,7 @@ import { ChatWorkspace } from "@/components/shared/ChatWorkspace";
 import { getSelectedProject, subscribeToSelectedProject } from "@/lib/projectStore";
 import { Message, Section } from "@/lib/types";
 import { ChevronRight, Target, Flag, Users, AlertTriangle, Circle, ChevronDown, StickyNote, Upload, Link2, RefreshCw, Trash2, FileText as FileTextIcon } from "lucide-react";
-import { cn, getBucketProgressPercent } from "@/lib/utils";
+import { cn, getProgressPercent } from "@/lib/utils";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -453,7 +453,7 @@ export default function BriefPage() {
                                         <div 
                                             className="h-full bg-primary/80" 
                                             style={{
-                                                width: `${getBucketProgressPercent({
+                                                width: `${getProgressPercent({
                                                     explicitPercent: section.completeness,
                                                     completedItems: section.completedItems,
                                                     totalItems: section.totalItems,
