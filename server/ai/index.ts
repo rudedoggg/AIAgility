@@ -1,4 +1,6 @@
 import type { AIProvider } from "./types";
+import { AnthropicProvider } from "./anthropic";
+import { OpenAIProvider } from "./openai";
 
 let cachedProvider: AIProvider | null = null;
 
@@ -8,16 +10,12 @@ export function getAIProvider(): AIProvider {
   const providerName = (process.env.AI_PROVIDER || "anthropic").toLowerCase();
 
   switch (providerName) {
-    case "anthropic": {
-      const { AnthropicProvider } = require("./anthropic") as typeof import("./anthropic");
+    case "anthropic":
       cachedProvider = new AnthropicProvider();
       break;
-    }
-    case "openai": {
-      const { OpenAIProvider } = require("./openai") as typeof import("./openai");
+    case "openai":
       cachedProvider = new OpenAIProvider();
       break;
-    }
     default:
       throw new Error(`Unknown AI_PROVIDER: ${providerName}. Use "anthropic" or "openai".`);
   }
