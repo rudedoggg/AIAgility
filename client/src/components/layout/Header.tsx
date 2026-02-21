@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "next-themes";
 import { api } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 function generateTemplateFromSnippet(projectName: string, snippet: string) {
   const cleaned = snippet.replace(/\s+/g, " ").trim();
@@ -105,6 +106,7 @@ export function Header() {
   const [projectName, setProjectName] = useState(getSelectedProject().name);
   const { user, logout } = useAuth();
   const { theme, setTheme } = useTheme();
+  const { toast } = useToast();
 
   const userInitials = user
     ? ((user.firstName?.[0] || "") + (user.lastName?.[0] || "")).toUpperCase() || (user.email?.[0] || "?").toUpperCase()
@@ -148,54 +150,58 @@ export function Header() {
       });
 
       if (template) {
-        for (const goal of template.goals) {
-          const { items, ...goalData } = goal;
-          const createdGoal = await api.goals.create(project.id, goalData);
-          for (const item of items) {
-            await api.items.create({
-              parentId: createdGoal.id,
-              parentType: "goal",
-              ...item,
+        try {
+          for (const goal of template.goals) {
+            const { items, ...goalData } = goal;
+            const createdGoal = await api.goals.create(project.id, goalData);
+            for (const item of items) {
+              await api.items.create({
+                parentId: createdGoal.id,
+                parentType: "goal",
+                ...item,
+              });
+            }
+          }
+
+          for (const bucket of template.lab) {
+            const { items, ...bucketData } = bucket;
+            const createdBucket = await api.lab.create(project.id, bucketData);
+            for (const item of items) {
+              await api.items.create({
+                parentId: createdBucket.id,
+                parentType: "labBucket",
+                ...item,
+              });
+            }
+          }
+
+          for (const deliverable of template.deliverables) {
+            const { items, ...delivData } = deliverable;
+            const createdDeliv = await api.deliverables.create(project.id, delivData);
+            for (const item of items) {
+              await api.items.create({
+                parentId: createdDeliv.id,
+                parentType: "deliverable",
+                ...item,
+              });
+            }
+          }
+
+          const pageTypes = ["dashboard_page", "goal_page", "lab_page", "deliverable_page"];
+          for (const pageType of pageTypes) {
+            await api.messages.create({
+              parentId: project.id,
+              parentType: pageType,
+              role: "assistant",
+              content: `Welcome to ${name}! I'm ready to help you with your ${pageType}. Ask me anything.`,
+              timestamp: new Date().toISOString(),
+              hasSaveableContent: false,
+              saved: false,
+              sortOrder: 0,
             });
           }
-        }
-
-        for (const bucket of template.lab) {
-          const { items, ...bucketData } = bucket;
-          const createdBucket = await api.lab.create(project.id, bucketData);
-          for (const item of items) {
-            await api.items.create({
-              parentId: createdBucket.id,
-              parentType: "labBucket",
-              ...item,
-            });
-          }
-        }
-
-        for (const deliverable of template.deliverables) {
-          const { items, ...delivData } = deliverable;
-          const createdDeliv = await api.deliverables.create(project.id, delivData);
-          for (const item of items) {
-            await api.items.create({
-              parentId: createdDeliv.id,
-              parentType: "deliverable",
-              ...item,
-            });
-          }
-        }
-
-        const pageTypes = ["dashboard_page", "goal_page", "lab_page", "deliverable_page"];
-        for (const pageType of pageTypes) {
-          await api.messages.create({
-            parentId: project.id,
-            parentType: pageType,
-            role: "assistant",
-            content: `Welcome to ${name}! I'm ready to help you with your ${pageType}. Ask me anything.`,
-            timestamp: new Date().toISOString(),
-            hasSaveableContent: false,
-            saved: false,
-            sortOrder: 0,
-          });
+        } catch (err) {
+          toast({ title: "Warning", description: "Project created but template seeding failed. You can add content manually.", variant: "destructive" });
         }
       }
 
@@ -204,6 +210,9 @@ export function Header() {
     onSuccess: (project) => {
       queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
       setSelectedProject({ id: project.id, name: project.name });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: `Failed to create project: ${err.message}`, variant: "destructive" });
     },
   });
 
