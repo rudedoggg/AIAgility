@@ -15,13 +15,13 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type ApiGoalSection, type ApiBucketItem } from "@/lib/api";
+import { api, type ApiBriefSection, type ApiBucketItem } from "@/lib/api";
 import { AppShell } from "@/components/layout/AppShell";
 import { ChatWorkspace } from "@/components/shared/ChatWorkspace";
 import { getSelectedProject, subscribeToSelectedProject } from "@/lib/projectStore";
 import { Message, Section } from "@/lib/types";
 import { ChevronRight, Target, Flag, Users, AlertTriangle, Circle, ChevronDown, StickyNote, Upload, Link2, RefreshCw, Trash2, FileText as FileTextIcon } from "lucide-react";
-import { cn, getBucketProgressPercent } from "@/lib/utils";
+import { cn, getProgressPercent } from "@/lib/utils";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -57,13 +57,13 @@ function getSectionIcon(id: string) {
 
 type LocalSection = Section;
 
-function GoalBucketChat({ sectionId, sectionName }: { sectionId: string; sectionName: string }) {
+function BriefSectionChat({ sectionId, sectionName }: { sectionId: string; sectionName: string }) {
   const queryClient = useQueryClient();
   const [messages, setMessages] = useState<Message[]>([]);
 
   const { data: bucketMsgs } = useQuery({
-    queryKey: ["/api/messages", "goal_bucket", sectionId],
-    queryFn: () => api.messages.list("goal_bucket", sectionId),
+    queryKey: ["/api/messages", "brief_section", sectionId],
+    queryFn: () => api.messages.list("brief_section", sectionId),
     enabled: !!sectionId,
   });
 
@@ -82,7 +82,7 @@ function GoalBucketChat({ sectionId, sectionName }: { sectionId: string; section
 
   const { streamingMessage, isStreaming, sendMessage } = useChatStream({
     parentId: sectionId,
-    parentType: "goal_bucket",
+    parentType: "brief_section",
   });
 
   const displayMessages = useMemo(() => {
@@ -112,19 +112,19 @@ function GoalBucketChat({ sectionId, sectionName }: { sectionId: string; section
   );
 }
 
-export default function GoalsPage() {
+export default function BriefPage() {
   const queryClient = useQueryClient();
   const [activeProject, setActiveProject] = useState(getSelectedProject());
 
-  const { data: goalSections } = useQuery({
-    queryKey: ["/api/projects", activeProject.id, "goals"],
-    queryFn: () => api.goals.list(activeProject.id),
+  const { data: briefSections } = useQuery({
+    queryKey: ["/api/projects", activeProject.id, "brief"],
+    queryFn: () => api.brief.list(activeProject.id),
     enabled: !!activeProject.id,
   });
 
   const { data: pageMessages } = useQuery({
-    queryKey: ["/api/messages", "goal_page", activeProject.id],
-    queryFn: () => api.messages.list("goal_page", activeProject.id),
+    queryKey: ["/api/messages", "brief_page", activeProject.id],
+    queryFn: () => api.messages.list("brief_page", activeProject.id),
     enabled: !!activeProject.id,
   });
 
@@ -154,12 +154,12 @@ export default function GoalsPage() {
   }, [pageMessages]);
 
   useEffect(() => {
-    if (goalSections) {
+    if (briefSections) {
       setSections(prev => {
         const openState: Record<string, boolean> = {};
         prev.forEach(s => { openState[s.id] = !!s.isOpen; });
 
-        return goalSections.map(gs => ({
+        return briefSections.map(gs => ({
           id: gs.id,
           genericName: gs.genericName,
           subtitle: gs.subtitle,
@@ -181,7 +181,7 @@ export default function GoalsPage() {
         }));
       });
     }
-  }, [goalSections, sectionItems]);
+  }, [briefSections, sectionItems]);
 
   useEffect(() => {
     const unsub = subscribeToSelectedProject((p) => {
@@ -194,7 +194,7 @@ export default function GoalsPage() {
   const fetchSectionItems = useCallback(async (sectionId: string) => {
     if (sectionItems[sectionId]) return;
     try {
-      const items = await api.items.list("goal", sectionId);
+      const items = await api.items.list("brief", sectionId);
       setSectionItems(prev => ({ ...prev, [sectionId]: items }));
     } catch {
     }
@@ -202,7 +202,7 @@ export default function GoalsPage() {
 
   const { streamingMessage, isStreaming, sendMessage: sendPageMessage } = useChatStream({
     parentId: activeProject.id,
-    parentType: "goal_page",
+    parentType: "brief_page",
   });
 
   const displayMessages = useMemo(() => {
@@ -238,12 +238,12 @@ export default function GoalsPage() {
   const addSectionItem = (sectionId: string, item: NonNullable<Section["items"]>[number]) => {
       setSectionItems(prev => ({
         ...prev,
-        [sectionId]: [{ ...item, parentId: sectionId, parentType: "goal", url: (item as any).url || null, fileName: (item as any).fileName || null, fileSizeLabel: (item as any).fileSizeLabel || null, sortOrder: 0 } as ApiBucketItem, ...(prev[sectionId] || [])],
+        [sectionId]: [{ ...item, parentId: sectionId, parentType: "brief", url: (item as any).url || null, fileName: (item as any).fileName || null, fileSizeLabel: (item as any).fileSizeLabel || null, sortOrder: 0 } as ApiBucketItem, ...(prev[sectionId] || [])],
       }));
 
       api.items.create({
         parentId: sectionId,
-        parentType: "goal",
+        parentType: "brief",
         type: item.type,
         title: item.title,
         preview: item.preview,
@@ -322,14 +322,14 @@ export default function GoalsPage() {
       if (oldIndex === -1 || newIndex === -1) return prev;
       const reordered = arrayMove(prev, oldIndex, newIndex);
 
-      api.goals.reorder(activeProject.id, reordered.map(s => s.id)).catch(() => {});
+      api.brief.reorder(activeProject.id, reordered.map(s => s.id)).catch(() => {});
 
       return reordered;
     });
   };
 
   const handleAddSection = () => {
-    const name = window.prompt("New goal section", "New section");
+    const name = window.prompt("New brief section", "New section");
     if (!name) return;
 
     const tempId = `section-${Date.now()}`;
@@ -347,7 +347,7 @@ export default function GoalsPage() {
 
     setSections((prev) => [newSection, ...prev]);
 
-    api.goals.create(activeProject.id, {
+    api.brief.create(activeProject.id, {
       genericName: name,
       subtitle: "(draft)",
       completeness: 0,
@@ -363,10 +363,10 @@ export default function GoalsPage() {
     }, 50);
   };
 
-  const summaryStatus = projectData?.dashboardStatus?.status || "Seeded from the project summary. Next: make the goals explicit.";
+  const summaryStatus = projectData?.dashboardStatus?.status || "Seeded from the project summary. Next: make the brief explicit.";
   const summaryDone = projectData?.dashboardStatus?.done || ["Project seeded"];
   const summaryUndone = projectData?.dashboardStatus?.undone || ["Define objective", "List constraints"];
-  const summaryNextSteps = projectData?.dashboardStatus?.nextSteps || ["Create goal sections", "Add stakeholders"];
+  const summaryNextSteps = projectData?.dashboardStatus?.nextSteps || ["Create brief sections", "Add stakeholders"];
 
   const SidebarContent = (
       <div className="space-y-0">
@@ -383,13 +383,13 @@ export default function GoalsPage() {
         </DndContext>
 
           <Button
-            data-testid="button-add-bucket"
+            data-testid="button-add-section"
             variant="ghost"
             size="sm"
             className="w-full justify-start px-3 mt-2 text-xs text-muted-foreground hover:text-primary"
             onClick={handleAddSection}
           >
-            + Add Goal Section
+            + Add Brief Section
           </Button>
       </div>
   );
@@ -397,12 +397,12 @@ export default function GoalsPage() {
   const getSectionItemsList = (sectionId: string) => sectionItems[sectionId] || [];
 
   return (
-    <AppShell 
-        navContent={SidebarContent} 
-        navTitle="Project Goals"
+    <AppShell
+        navContent={SidebarContent}
+        navTitle="Sections"
         statusContent={
-            <SummaryCard 
-                title="Goals Status"
+            <SummaryCard
+                title="Brief Status"
                 status={summaryStatus}
                 done={summaryDone}
                 undone={summaryUndone}
@@ -436,7 +436,7 @@ export default function GoalsPage() {
             />
         }
     >
-        {/* Bottom: All Goal Sections */}
+        {/* Bottom: All Brief Sections */}
         <div className="bg-background h-full">
             <ScrollArea className="h-full">
                 <div className="flex flex-col gap-3 p-3">
@@ -444,7 +444,7 @@ export default function GoalsPage() {
                         const items = getSectionItemsList(section.id);
                         return (
                         <div key={section.id} ref={el => { if (el) sectionRefs.current[section.id] = el; }} className={`bg-background rounded-lg shadow-sm border border-border/40 border-t-[3px] ${ACCENT_COLORS[index % ACCENT_COLORS.length]}`}>
-                            <div 
+                            <div
                                 className="flex items-center justify-between px-6 py-3 cursor-pointer hover:bg-muted/5 transition-colors group"
                                 onClick={() => toggleSection(section.id)}
                             >
@@ -458,10 +458,10 @@ export default function GoalsPage() {
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden" data-testid={`progress-${section.id}`}>
-                                        <div 
-                                            className="h-full bg-primary/80" 
+                                        <div
+                                            className="h-full bg-primary/80"
                                             style={{
-                                                width: `${getBucketProgressPercent({
+                                                width: `${getProgressPercent({
                                                     explicitPercent: section.completeness,
                                                     completedItems: section.completedItems,
                                                     totalItems: section.totalItems,
@@ -560,8 +560,8 @@ export default function GoalsPage() {
                                             data-testid={`button-update-${section.id}`}
                                             className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                                             onClick={(e) => { e.stopPropagation(); }}
-                                            aria-label="Update bucket"
-                                            title="Update bucket"
+                                            aria-label="Update section"
+                                            title="Update section"
                                             type="button"
                                         >
                                             <RefreshCw className="w-3.5 h-3.5" />
@@ -569,7 +569,7 @@ export default function GoalsPage() {
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <AnimatePresence initial={false}>
                                 {section.isOpen && (
                                     <motion.div
@@ -583,7 +583,7 @@ export default function GoalsPage() {
                                             <div className="w-[60%] border-r border-border/50">
                                                 <div className="h-full flex flex-col">
                                                     <div className="flex-1 min-h-0">
-                                                        <GoalBucketChat
+                                                        <BriefSectionChat
                                                             sectionId={section.id}
                                                             sectionName={section.genericName}
                                                         />
@@ -636,7 +636,7 @@ export default function GoalsPage() {
                                                     </div>
                                                 </div>
                                             </div>
-                                            
+
                                             {/* Right History Column */}
                                             <div className="w-[20%] bg-muted/5">
                                                 <ScopedHistory />
@@ -648,10 +648,10 @@ export default function GoalsPage() {
                         </div>
                         );
                     })}
-                    
+
                     <div className="p-8 text-center">
                         <Button variant="outline" className="text-muted-foreground border-dashed">
-                            Add New Goal Section
+                            Add New Brief Section
                         </Button>
                     </div>
                 </div>

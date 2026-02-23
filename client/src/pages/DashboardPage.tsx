@@ -98,14 +98,14 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="h-screen w-screen bg-muted/60 text-foreground font-sans flex flex-col overflow-hidden">
+    <div className="h-screen w-screen bg-gray-100 text-foreground font-sans flex flex-col overflow-hidden">
       <Header />
       <div className="flex-1 pt-[60px] h-full overflow-hidden w-full">
         <div className="h-full w-full p-2">
           <ResizablePanelGroup direction="horizontal" className="h-full w-full gap-2">
             <ResizablePanel defaultSize={60} minSize={40}>
               <div className="h-full flex flex-col gap-2">
-                <div className="bg-background rounded-lg shadow-sm border border-border/40 overflow-hidden shrink-0">
+                <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden shrink-0">
                   <div className="p-4 border-b">
                     <div className="text-xs uppercase tracking-wider text-muted-foreground" data-testid="text-dashboard-label">
                       Dashboard
@@ -123,7 +123,7 @@ export default function DashboardPage() {
                   />
                 </div>
 
-                <div className="flex-1 min-h-0 bg-background rounded-lg shadow-sm border border-border/40 overflow-hidden">
+                <div className="flex-1 min-h-0 bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
                   <ScrollArea className="h-full">
                     <div className="p-5">
                       <div className="flex items-center justify-between gap-3 mb-4">
@@ -149,7 +149,7 @@ export default function DashboardPage() {
                       >
                         {!executiveSummary && (
                           <p className="text-sm text-muted-foreground">
-                            This project is currently empty. Create Goals, Knowledge Buckets, and Deliverables to get an executive summary.
+                            This project is currently empty. Create Brief sections, Discovery categories, and Deliverable assets to get an executive summary.
                           </p>
                         )}
                         {!!executiveSummary && executiveSummary.split("\n").map((line, i) => {
@@ -173,7 +173,7 @@ export default function DashboardPage() {
             <ResizableHandle className="bg-transparent hover:bg-border/50 transition-colors w-[3px]" />
 
             <ResizablePanel defaultSize={40} minSize={25}>
-              <div className="h-full bg-background rounded-lg shadow-sm border border-border/40 overflow-hidden flex flex-col">
+              <div className="h-full bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden flex flex-col">
                 <ChatWorkspace
                   messages={displayMessages}
                   onSendMessage={handleSendMessage}

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type ApiLabBucket, type ApiBucketItem } from "@/lib/api";
+import { api, type ApiDiscoveryCategory, type ApiBucketItem } from "@/lib/api";
 import {
   DndContext,
   DragEndEvent,
@@ -19,9 +19,9 @@ import { CSS } from "@dnd-kit/utilities";
 import { AppShell } from "@/components/layout/AppShell";
 import { ChatWorkspace } from "@/components/shared/ChatWorkspace";
 import { getSelectedProject, subscribeToSelectedProject } from "@/lib/projectStore";
-import { Message, Bucket } from "@/lib/types";
+import { Message, Category } from "@/lib/types";
 import { FileText, Link as LinkIcon, MessageSquare, StickyNote, FolderOpen, Folder, Plus, ChevronRight, Upload, Link2, RefreshCw, Trash2 } from "lucide-react";
-import { cn, getBucketProgressPercent } from "@/lib/utils";
+import { cn, getProgressPercent } from "@/lib/utils";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -41,19 +41,19 @@ const ACCENT_COLORS = [
   "border-t-orange-400",
 ];
 
-function LabBucketChat({ bucketId }: { bucketId: string }) {
+function DiscoveryCategoryChat({ categoryId }: { categoryId: string }) {
   const queryClient = useQueryClient();
   const [messages, setMessages] = useState<Message[]>([]);
 
-  const { data: bucketMsgs } = useQuery({
-    queryKey: ["/api/messages", "lab_bucket", bucketId],
-    queryFn: () => api.messages.list("lab_bucket", bucketId),
-    enabled: !!bucketId,
+  const { data: categoryMsgs } = useQuery({
+    queryKey: ["/api/messages", "discovery_category", categoryId],
+    queryFn: () => api.messages.list("discovery_category", categoryId),
+    enabled: !!categoryId,
   });
 
   useEffect(() => {
-    if (bucketMsgs) {
-      setMessages(bucketMsgs.map(m => ({
+    if (categoryMsgs) {
+      setMessages(categoryMsgs.map(m => ({
         id: m.id,
         role: m.role as "user" | "ai",
         content: m.content,
@@ -62,11 +62,11 @@ function LabBucketChat({ bucketId }: { bucketId: string }) {
         saved: m.saved,
       })));
     }
-  }, [bucketMsgs]);
+  }, [categoryMsgs]);
 
   const { streamingMessage, isStreaming, sendMessage } = useChatStream({
-    parentId: bucketId,
-    parentType: "lab_bucket",
+    parentId: categoryId,
+    parentType: "discovery_category",
   });
 
   const displayMessages = useMemo(() => {
@@ -96,25 +96,25 @@ function LabBucketChat({ bucketId }: { bucketId: string }) {
   );
 }
 
-type LocalBucket = Bucket;
+type LocalCategory = Category;
 
-export default function LabPage() {
+export default function DiscoveryPage() {
   const queryClient = useQueryClient();
   const [activeProject, setActiveProject] = useState(getSelectedProject());
-  const [buckets, setBuckets] = useState<LocalBucket[]>([]);
+  const [categories, setCategories] = useState<LocalCategory[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
-  const bucketRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
+  const categoryRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
-  const { data: apiBuckets } = useQuery({
-    queryKey: ["/api/projects", activeProject.id, "lab"],
-    queryFn: () => api.lab.list(activeProject.id),
+  const { data: apiCategories } = useQuery({
+    queryKey: ["/api/projects", activeProject.id, "discovery"],
+    queryFn: () => api.discovery.list(activeProject.id),
     enabled: !!activeProject.id,
   });
 
   const { data: apiPageMessages } = useQuery({
-    queryKey: ["/api/messages", "lab_page", activeProject.id],
-    queryFn: () => api.messages.list("lab_page", activeProject.id),
+    queryKey: ["/api/messages", "discovery_page", activeProject.id],
+    queryFn: () => api.messages.list("discovery_page", activeProject.id),
     enabled: !!activeProject.id,
   });
 
@@ -133,7 +133,7 @@ export default function LabPage() {
 
   const { streamingMessage, isStreaming, sendMessage: sendPageMessage } = useChatStream({
     parentId: activeProject.id,
-    parentType: "lab_page",
+    parentType: "discovery_page",
   });
 
   const displayMessages = useMemo(() => {
@@ -143,11 +143,11 @@ export default function LabPage() {
   }, [messages, streamingMessage]);
 
   useEffect(() => {
-    if (!apiBuckets || !Array.isArray(apiBuckets)) return;
+    if (!apiCategories || !Array.isArray(apiCategories)) return;
 
-    setBuckets(prev => {
+    setCategories(prev => {
       const prevMap = new Map(prev.map(b => [b.id, b]));
-      return apiBuckets.map(ab => {
+      return apiCategories.map(ab => {
         const existing = prevMap.get(ab.id);
         return {
           id: ab.id,
@@ -158,9 +158,9 @@ export default function LabPage() {
       });
     });
 
-    apiBuckets.forEach(ab => {
-      api.items.list("lab", ab.id).then(items => {
-        setBuckets(prev => prev.map(b => {
+    apiCategories.forEach(ab => {
+      api.items.list("discovery", ab.id).then(items => {
+        setCategories(prev => prev.map(b => {
           if (b.id !== ab.id) return b;
           return {
             ...b,
@@ -178,7 +178,7 @@ export default function LabPage() {
         }));
       }).catch(() => {});
     });
-  }, [apiBuckets]);
+  }, [apiCategories]);
 
   useEffect(() => {
     const unsub = subscribeToSelectedProject((p) => {
@@ -187,16 +187,16 @@ export default function LabPage() {
     return () => unsub();
   }, []);
 
-  const toggleBucket = (id: string) => {
-      setBuckets(prev => prev.map(b => b.id === id ? { ...b, isOpen: !b.isOpen } : b));
+  const toggleCategory = (id: string) => {
+      setCategories(prev => prev.map(b => b.id === id ? { ...b, isOpen: !b.isOpen } : b));
   };
 
-  const addBucketItem = (bucketId: string, item: Bucket["items"][number]) => {
-      setBuckets(prev => prev.map(b => b.id === bucketId ? { ...b, items: [item, ...b.items] } : b));
+  const addCategoryItem = (categoryId: string, item: Category["items"][number]) => {
+      setCategories(prev => prev.map(b => b.id === categoryId ? { ...b, items: [item, ...b.items] } : b));
 
       api.items.create({
-        parentId: bucketId,
-        parentType: "lab",
+        parentId: categoryId,
+        parentType: "discovery",
         type: item.type,
         title: item.title,
         preview: item.preview,
@@ -205,8 +205,8 @@ export default function LabPage() {
         fileName: (item as any).fileName || null,
         fileSizeLabel: (item as any).fileSizeLabel || null,
       }).then(created => {
-        setBuckets(prev => prev.map(b => {
-          if (b.id !== bucketId) return b;
+        setCategories(prev => prev.map(b => {
+          if (b.id !== categoryId) return b;
           return {
             ...b,
             items: b.items.map(i => i.id === item.id ? { ...i, id: created.id } : i),
@@ -215,36 +215,36 @@ export default function LabPage() {
       }).catch(() => {});
   };
 
-  const deleteBucketItem = (bucketId: string, itemId: string) => {
-      setBuckets(prev => prev.map(b => b.id === bucketId ? { ...b, items: b.items.filter(i => i.id !== itemId) } : b));
+  const deleteCategoryItem = (categoryId: string, itemId: string) => {
+      setCategories(prev => prev.map(b => b.id === categoryId ? { ...b, items: b.items.filter(i => i.id !== itemId) } : b));
 
       api.items.delete(itemId).catch(() => {});
   };
 
-  const scrollToBucket = (id: string) => {
-      setBuckets(prev => prev.map(b => b.id === id ? { ...b, isOpen: true } : b));
+  const scrollToCategory = (id: string) => {
+      setCategories(prev => prev.map(b => b.id === id ? { ...b, isOpen: true } : b));
       setTimeout(() => {
-          bucketRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          categoryRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 50);
   };
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
-  const bucketIds = useMemo(() => buckets.map((b) => b.id), [buckets]);
+  const categoryIds = useMemo(() => categories.map((b) => b.id), [categories]);
 
-  function SortableNavRow({ bucketId }: { bucketId: string }) {
-    const bucket = buckets.find((b) => b.id === bucketId);
-    const sortable = useSortable({ id: bucketId });
+  function SortableNavRow({ categoryId }: { categoryId: string }) {
+    const category = categories.find((b) => b.id === categoryId);
+    const sortable = useSortable({ id: categoryId });
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = sortable;
 
-    if (!bucket) return null;
+    if (!category) return null;
 
     return (
       <div
         ref={setNodeRef}
         {...attributes}
         {...listeners}
-        data-testid={`nav-row-${bucket.id}`}
-        onClick={() => scrollToBucket(bucket.id)}
+        data-testid={`nav-row-${category.id}`}
+        onClick={() => scrollToCategory(category.id)}
         className={cn(
           "flex items-center gap-2 px-3 py-2 text-sm font-medium border-l-2 cursor-pointer transition-colors select-none",
           "border-transparent text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50",
@@ -257,8 +257,8 @@ export default function LabPage() {
         }}
       >
         <Folder className="w-3.5 h-3.5" />
-        <span className="truncate flex-1">{bucket.name}</span>
-        <span className="text-[10px] bg-sidebar-border px-1.5 rounded-sm">{bucket.items.length}</span>
+        <span className="truncate flex-1">{category.name}</span>
+        <span className="text-[10px] bg-sidebar-border px-1.5 rounded-sm">{category.items.length}</span>
       </div>
     );
   }
@@ -273,36 +273,36 @@ export default function LabPage() {
             if (!over) return;
             if (active.id === over.id) return;
 
-            setBuckets((prev) => {
+            setCategories((prev) => {
               const oldIndex = prev.findIndex((b) => b.id === active.id);
               const newIndex = prev.findIndex((b) => b.id === over.id);
               if (oldIndex === -1 || newIndex === -1) return prev;
               const reordered = arrayMove(prev, oldIndex, newIndex);
 
-              api.lab.reorder(activeProject.id, reordered.map(b => b.id)).catch(() => {});
+              api.discovery.reorder(activeProject.id, reordered.map(b => b.id)).catch(() => {});
 
               return reordered;
             });
           }}
         >
-          <SortableContext items={bucketIds} strategy={verticalListSortingStrategy}>
-            {bucketIds.map((id) => (
-              <SortableNavRow key={id} bucketId={id} />
+          <SortableContext items={categoryIds} strategy={verticalListSortingStrategy}>
+            {categoryIds.map((id) => (
+              <SortableNavRow key={id} categoryId={id} />
             ))}
           </SortableContext>
         </DndContext>
 
           <Button
-            data-testid="button-add-bucket"
+            data-testid="button-add-category"
             variant="ghost"
             size="sm"
             className="w-full justify-start px-3 mt-2 text-xs text-muted-foreground hover:text-primary"
             onClick={() => {
-              const name = window.prompt("New knowledge bucket", "New bucket");
+              const name = window.prompt("New category", "New category");
               if (!name) return;
 
-              const id = `bucket-${Date.now()}`;
-              setBuckets((prev) => [
+              const id = `category-${Date.now()}`;
+              setCategories((prev) => [
                 {
                   id,
                   name,
@@ -312,16 +312,16 @@ export default function LabPage() {
                 ...prev,
               ]);
 
-              api.lab.create(activeProject.id, { name }).then(created => {
-                setBuckets(prev => prev.map(b => b.id === id ? { ...b, id: created.id, name: created.name } : b));
+              api.discovery.create(activeProject.id, { name }).then(created => {
+                setCategories(prev => prev.map(b => b.id === id ? { ...b, id: created.id, name: created.name } : b));
               }).catch(() => {});
 
               setTimeout(() => {
-                bucketRefs.current[id]?.scrollIntoView({ behavior: "smooth", block: "start" });
+                categoryRefs.current[id]?.scrollIntoView({ behavior: "smooth", block: "start" });
               }, 50);
             }}
           >
-            + New Knowledge Bucket
+            + New Category
           </Button>
       </div>
   );
@@ -329,13 +329,13 @@ export default function LabPage() {
   return (
     <AppShell 
         navContent={SidebarContent} 
-        navTitle="Knowledge Buckets"
+        navTitle="Categories"
         statusContent={
             <SummaryCard 
-                title="Lab Status"
+                title="Discovery Status"
                 status="Seeded from the project summary. Next: capture evidence and open questions."
                 done={[]}
-                undone={["Add first evidence bucket"]}
+                undone={["Add first evidence category"]}
                 nextSteps={["Add sources", "Log assumptions"]}
             />
         }
@@ -353,7 +353,7 @@ export default function LabPage() {
                   sendPageMessage(content);
                 }}
                 isStreaming={isStreaming}
-                saveDestinations={buckets.map((b) => ({ id: b.id, label: b.name }))}
+                saveDestinations={categories.map((b) => ({ id: b.id, label: b.name }))}
                 onSaveContent={(messageId, destinationId) => {
                     const msg = messages.find((m) => m.id === messageId);
                     if (!msg) return;
@@ -365,7 +365,7 @@ export default function LabPage() {
                     const noteTitle = msg.content.split("\n")[0]?.slice(0, 80) || "Saved chat";
                     const noteBody = msg.content;
 
-                    addBucketItem(destinationId, {
+                    addCategoryItem(destinationId, {
                         id: `chat-${Date.now()}`,
                         type: 'note',
                         title: noteTitle,
@@ -380,25 +380,25 @@ export default function LabPage() {
          <div className="bg-background h-full">
              <ScrollArea className="h-full">
                 <div className="flex flex-col gap-3 p-3">
-                    {buckets.map((bucket, index) => (
-                        <div key={bucket.id} ref={el => { if (el) bucketRefs.current[bucket.id] = el; }} className={`bg-background rounded-lg shadow-sm border border-border/40 border-t-[3px] ${ACCENT_COLORS[index % ACCENT_COLORS.length]}`}>
+                    {categories.map((category, index) => (
+                        <div key={category.id} ref={el => { if (el) categoryRefs.current[category.id] = el; }} className={`bg-background rounded-lg shadow-sm border border-border/40 border-t-[3px] ${ACCENT_COLORS[index % ACCENT_COLORS.length]}`}>
                             <div 
                                 className="flex items-center px-6 py-3 cursor-pointer hover:bg-muted/5 transition-colors group"
-                                onClick={() => toggleBucket(bucket.id)}
+                                onClick={() => toggleCategory(category.id)}
                             >
-                                <div className={cn("text-muted-foreground transition-transform duration-200 mr-2", bucket.isOpen ? "rotate-90" : "")}>
+                                <div className={cn("text-muted-foreground transition-transform duration-200 mr-2", category.isOpen ? "rotate-90" : "")}>
                                     <ChevronRight className="w-4 h-4" />
                                 </div>
                                 <h2 className="text-sm font-bold font-heading text-foreground flex-1">
-                                    {bucket.name}
+                                    {category.name}
                                 </h2>
                                 <div className="flex items-center gap-2">
-                                    <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden" data-testid={`progress-${bucket.id}`}>
+                                    <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden" data-testid={`progress-${category.id}`}>
                                         <div
                                             className="h-full bg-primary/80"
                                             style={{
-                                                width: `${getBucketProgressPercent({
-                                                    itemsCount: bucket.items.length,
+                                                width: `${getProgressPercent({
+                                                    itemsCount: category.items.length,
                                                 })}%`,
                                             }}
                                         />
@@ -406,15 +406,15 @@ export default function LabPage() {
 
                                     <div className="flex items-center gap-1">
                                         <button
-                                            data-testid={`button-note-${bucket.id}`}
+                                            data-testid={`button-note-${category.id}`}
                                             className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                const title = window.prompt(`New note in "${bucket.name}"`, "Quick note");
+                                                const title = window.prompt(`New note in "${category.name}"`, "Quick note");
                                                 if (!title) return;
                                                 const content = window.prompt("Note text", "");
 
-                                                addBucketItem(bucket.id, {
+                                                addCategoryItem(category.id, {
                                                     id: `${Date.now()}`,
                                                     type: 'note',
                                                     title,
@@ -430,16 +430,16 @@ export default function LabPage() {
                                         </button>
 
                                         <input
-                                            ref={(el) => { fileInputRefs.current[bucket.id] = el; }}
+                                            ref={(el) => { fileInputRefs.current[category.id] = el; }}
                                             className="hidden"
-                                            data-testid={`input-file-${bucket.id}`}
+                                            data-testid={`input-file-${category.id}`}
                                             type="file"
                                             onClick={(e) => e.stopPropagation()}
                                             onChange={(e) => {
                                                 const file = e.currentTarget.files?.[0];
                                                 if (!file) return;
 
-                                                addBucketItem(bucket.id, {
+                                                addCategoryItem(category.id, {
                                                     id: `${Date.now()}`,
                                                     type: 'file',
                                                     title: file.name,
@@ -454,11 +454,11 @@ export default function LabPage() {
                                         />
 
                                         <button
-                                            data-testid={`button-upload-${bucket.id}`}
+                                            data-testid={`button-upload-${category.id}`}
                                             className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                fileInputRefs.current[bucket.id]?.click();
+                                                fileInputRefs.current[category.id]?.click();
                                             }}
                                             aria-label="Upload a file"
                                             title="Upload a file"
@@ -468,7 +468,7 @@ export default function LabPage() {
                                         </button>
 
                                         <button
-                                            data-testid={`button-link-${bucket.id}`}
+                                            data-testid={`button-link-${category.id}`}
                                             className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -476,7 +476,7 @@ export default function LabPage() {
                                                 if (!url) return;
                                                 const title = window.prompt("Link name", url) || url;
 
-                                                addBucketItem(bucket.id, {
+                                                addCategoryItem(category.id, {
                                                     id: `${Date.now()}`,
                                                     type: 'link',
                                                     title,
@@ -493,11 +493,11 @@ export default function LabPage() {
                                         </button>
 
                                         <button
-                                            data-testid={`button-update-${bucket.id}`}
+                                            data-testid={`button-update-${category.id}`}
                                             className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                                             onClick={(e) => { e.stopPropagation(); }}
-                                            aria-label="Update bucket"
-                                            title="Update bucket"
+                                            aria-label="Update category"
+                                            title="Update category"
                                             type="button"
                                         >
                                             <RefreshCw className="w-3.5 h-3.5" />
@@ -507,7 +507,7 @@ export default function LabPage() {
                             </div>
                             
                             <AnimatePresence initial={false}>
-                                {bucket.isOpen && (
+                                {category.isOpen && (
                                     <motion.div
                                         initial={{ height: 0, opacity: 0 }}
                                         animate={{ height: "auto", opacity: 1 }}
@@ -519,8 +519,8 @@ export default function LabPage() {
                                             <div className="w-[60%] border-r border-border/50">
                                                 <div className="h-full flex flex-col">
                                                     <div className="flex-1 min-h-0">
-                                                        <LabBucketChat
-                                                            bucketId={bucket.id}
+                                                        <DiscoveryCategoryChat
+                                                            categoryId={category.id}
                                                         />
                                                     </div>
                                                 </div>
@@ -529,13 +529,13 @@ export default function LabPage() {
                                             {/* Right Attachments Column */}
                                             <div className="w-[20%] bg-muted/5 border-r border-border/50">
                                                 <div className="h-full flex flex-col">
-                                                    <div className="px-4 py-3 border-b border-border/50 text-[11px] uppercase tracking-wider text-muted-foreground" data-testid={`text-attachments-title-${bucket.id}`}>Memory</div>
+                                                    <div className="px-4 py-3 border-b border-border/50 text-[11px] uppercase tracking-wider text-muted-foreground" data-testid={`text-attachments-title-${category.id}`}>Memory</div>
                                                     <div className="flex-1 overflow-y-auto">
-                                                        {(bucket.items || []).length === 0 ? (
-                                                            <div className="px-4 py-3 text-sm text-muted-foreground" data-testid={`text-attachments-empty-${bucket.id}`}>No files, links, or notes yet.</div>
+                                                        {(category.items || []).length === 0 ? (
+                                                            <div className="px-4 py-3 text-sm text-muted-foreground" data-testid={`text-attachments-empty-${category.id}`}>No files, links, or notes yet.</div>
                                                         ) : (
                                                             <div className="divide-y">
-                                                                {(bucket.items || []).map((item) => (
+                                                                {(category.items || []).map((item) => (
                                                                     <div key={item.id} className="group flex items-start gap-3 px-4 py-3">
                                                                         <div className="mt-0.5 text-muted-foreground group-hover:text-primary transition-colors">
                                                                             {(item.type === 'file' || item.type === 'doc') && <FileText className="w-4 h-4" />}
@@ -553,7 +553,7 @@ export default function LabPage() {
                                                                                         className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 opacity-0 group-hover:opacity-100 transition-opacity"
                                                                                         onClick={(e) => {
                                                                                             e.stopPropagation();
-                                                                                            deleteBucketItem(bucket.id, item.id);
+                                                                                            deleteCategoryItem(category.id, item.id);
                                                                                         }}
                                                                                         aria-label="Delete item"
                                                                                         title="Delete item"

@@ -111,7 +111,7 @@ export function ChatWorkspace({ messages, onSendMessage, onSaveContent, saveDest
                                 </DropdownMenuTrigger>
                               </TooltipTrigger>
                               <TooltipContent side="left" className="text-xs">
-                                Save to a bucket
+                                Save content
                               </TooltipContent>
                             </Tooltip>
 

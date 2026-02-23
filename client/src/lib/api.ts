@@ -15,7 +15,7 @@ export type ApiProject = {
   createdAt: string;
 };
 
-export type ApiGoalSection = {
+export type ApiBriefSection = {
   id: string;
   projectId: string;
   genericName: string;
@@ -27,7 +27,7 @@ export type ApiGoalSection = {
   sortOrder: number;
 };
 
-export type ApiLabBucket = {
+export type ApiDiscoveryCategory = {
   id: string;
   projectId: string;
   name: string;
@@ -94,20 +94,20 @@ export const api = {
     delete: (id: string) => apiRequest("DELETE", `/api/projects/${id}`),
   },
 
-  goals: {
-    list: (projectId: string) => fetchJson<ApiGoalSection[]>(`/api/projects/${projectId}/goals`),
-    create: (projectId: string, data: Partial<ApiGoalSection>) => apiRequest("POST", `/api/projects/${projectId}/goals`, data).then(json<ApiGoalSection>),
-    update: (id: string, data: Partial<ApiGoalSection>) => apiRequest("PATCH", `/api/goals/${id}`, data).then(json<ApiGoalSection>),
-    delete: (id: string) => apiRequest("DELETE", `/api/goals/${id}`),
-    reorder: (projectId: string, ids: string[]) => apiRequest("PUT", `/api/projects/${projectId}/goals/reorder`, { ids }),
+  brief: {
+    list: (projectId: string) => fetchJson<ApiBriefSection[]>(`/api/projects/${projectId}/brief`),
+    create: (projectId: string, data: Partial<ApiBriefSection>) => apiRequest("POST", `/api/projects/${projectId}/brief`, data).then(json<ApiBriefSection>),
+    update: (id: string, data: Partial<ApiBriefSection>) => apiRequest("PATCH", `/api/brief/${id}`, data).then(json<ApiBriefSection>),
+    delete: (id: string) => apiRequest("DELETE", `/api/brief/${id}`),
+    reorder: (projectId: string, ids: string[]) => apiRequest("PUT", `/api/projects/${projectId}/brief/reorder`, { ids }),
   },
 
-  lab: {
-    list: (projectId: string) => fetchJson<ApiLabBucket[]>(`/api/projects/${projectId}/lab`),
-    create: (projectId: string, data: Partial<ApiLabBucket>) => apiRequest("POST", `/api/projects/${projectId}/lab`, data).then(json<ApiLabBucket>),
-    update: (id: string, data: Partial<ApiLabBucket>) => apiRequest("PATCH", `/api/lab/${id}`, data).then(json<ApiLabBucket>),
-    delete: (id: string) => apiRequest("DELETE", `/api/lab/${id}`),
-    reorder: (projectId: string, ids: string[]) => apiRequest("PUT", `/api/projects/${projectId}/lab/reorder`, { ids }),
+  discovery: {
+    list: (projectId: string) => fetchJson<ApiDiscoveryCategory[]>(`/api/projects/${projectId}/discovery`),
+    create: (projectId: string, data: Partial<ApiDiscoveryCategory>) => apiRequest("POST", `/api/projects/${projectId}/discovery`, data).then(json<ApiDiscoveryCategory>),
+    update: (id: string, data: Partial<ApiDiscoveryCategory>) => apiRequest("PATCH", `/api/discovery/${id}`, data).then(json<ApiDiscoveryCategory>),
+    delete: (id: string) => apiRequest("DELETE", `/api/discovery/${id}`),
+    reorder: (projectId: string, ids: string[]) => apiRequest("PUT", `/api/projects/${projectId}/discovery/reorder`, { ids }),
   },
 
   deliverables: {

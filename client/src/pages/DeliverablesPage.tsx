@@ -21,7 +21,7 @@ import { ChatWorkspace } from "@/components/shared/ChatWorkspace";
 import { getSelectedProject, subscribeToSelectedProject } from "@/lib/projectStore";
 import { Message, Deliverable } from "@/lib/types";
 import { FileText, Download, Share2, CheckSquare, Edit3, ChevronRight, StickyNote, Upload, Link2, RefreshCw, Trash2, FileText as FileTextIcon } from "lucide-react";
-import { cn, getBucketProgressPercent } from "@/lib/utils";
+import { cn, getProgressPercent } from "@/lib/utils";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -42,13 +42,13 @@ const ACCENT_COLORS = [
   "border-t-orange-400",
 ];
 
-function DeliverableBucketChat({ deliverableId }: { deliverableId: string }) {
+function DeliverableAssetChat({ deliverableId }: { deliverableId: string }) {
   const queryClient = useQueryClient();
   const [messages, setMessages] = useState<Message[]>([]);
 
   const { data: bucketMsgs } = useQuery({
-    queryKey: ["/api/messages", "deliverable_bucket", deliverableId],
-    queryFn: () => api.messages.list("deliverable_bucket", deliverableId),
+    queryKey: ["/api/messages", "deliverable_asset", deliverableId],
+    queryFn: () => api.messages.list("deliverable_asset", deliverableId),
     enabled: !!deliverableId,
   });
 
@@ -67,7 +67,7 @@ function DeliverableBucketChat({ deliverableId }: { deliverableId: string }) {
 
   const { streamingMessage, isStreaming, sendMessage } = useChatStream({
     parentId: deliverableId,
-    parentType: "deliverable_bucket",
+    parentType: "deliverable_asset",
   });
 
   const displayMessages = useMemo(() => {
@@ -332,7 +332,7 @@ export default function DeliverablesPage() {
         </DndContext>
 
           <Button
-            data-testid="button-add-bucket"
+            data-testid="button-add-asset"
             variant="ghost"
             size="sm"
             className="w-full justify-start px-3 mt-2 text-xs text-muted-foreground hover:text-primary"
@@ -380,7 +380,7 @@ export default function DeliverablesPage() {
   return (
     <AppShell 
         navContent={SidebarContent} 
-        navTitle="Deliverables"
+        navTitle="Assets"
         statusContent={
             <SummaryCard 
                 title="Deliverables Status"
@@ -436,9 +436,9 @@ export default function DeliverablesPage() {
                                 <div className="flex items-center gap-3 flex-1 min-w-0">
                                     <FileText className="w-4 h-4 text-primary shrink-0" />
                                     <div className="min-w-0">
-                                        <h2 className="text-sm font-bold font-heading text-foreground truncate" data-testid={`text-bucket-title-${doc.id}`}>{doc.title}</h2>
+                                        <h2 className="text-sm font-bold font-heading text-foreground truncate" data-testid={`text-asset-title-${doc.id}`}>{doc.title}</h2>
                                         {doc.subtitle ? (
-                                            <div className="text-xs text-muted-foreground truncate" data-testid={`text-bucket-subtitle-${doc.id}`}>{doc.subtitle}</div>
+                                            <div className="text-xs text-muted-foreground truncate" data-testid={`text-asset-subtitle-${doc.id}`}>{doc.subtitle}</div>
                                         ) : null}
                                     </div>
                                 </div>
@@ -447,7 +447,7 @@ export default function DeliverablesPage() {
                                         <div
                                             className="h-full bg-primary/80"
                                             style={{
-                                                width: `${getBucketProgressPercent({
+                                                width: `${getProgressPercent({
                                                     explicitPercent: doc.completeness,
                                                     itemsCount: ((doc.items || []) as any[]).length,
                                                 })}%`,
@@ -546,8 +546,8 @@ export default function DeliverablesPage() {
                                             data-testid={`button-update-${doc.id}`}
                                             className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                                             onClick={(e) => { e.stopPropagation(); }}
-                                            aria-label="Update bucket"
-                                            title="Update bucket"
+                                            aria-label="Update asset"
+                                            title="Update asset"
                                             type="button"
                                         >
                                             <RefreshCw className="w-3.5 h-3.5" />
@@ -569,7 +569,7 @@ export default function DeliverablesPage() {
                                             <div className="w-[60%] border-r border-border/50">
                                                 <div className="h-full flex flex-col">
                                                     <div className="flex-1 min-h-0">
-                                                        <DeliverableBucketChat
+                                                        <DeliverableAssetChat
                                                             deliverableId={doc.id}
                                                         />
                                                     </div>

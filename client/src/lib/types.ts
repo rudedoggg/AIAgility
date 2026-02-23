@@ -33,7 +33,7 @@ export type BucketItem = {
   fileSizeLabel?: string;
 };
 
-export type Bucket = {
+export type Category = {
   id: string;
   name: string;
   items: BucketItem[];

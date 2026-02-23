@@ -22,9 +22,9 @@ function generateTemplateFromSnippet(projectName: string, snippet: string) {
       status: `Seeded from the project summary. Next: turn the narrative into explicit goals + constraints.`,
       done: ["Project seeded"],
       undone: ["Define objective", "List constraints"],
-      nextSteps: ["Create 3 goal sections", "Add stakeholders"],
+      nextSteps: ["Create 3 brief sections", "Add stakeholders"],
     },
-    goals: [
+    brief: [
       {
         genericName: "Context",
         subtitle: "What's happening and why now",
@@ -66,7 +66,7 @@ function generateTemplateFromSnippet(projectName: string, snippet: string) {
         items: [],
       },
     ],
-    lab: [
+    discovery: [
       {
         name: "Sources + Evidence",
         sortOrder: 0,
@@ -151,25 +151,25 @@ export function Header() {
 
       if (template) {
         try {
-          for (const goal of template.goals) {
-            const { items, ...goalData } = goal;
-            const createdGoal = await api.goals.create(project.id, goalData);
+          for (const section of template.brief) {
+            const { items, ...sectionData } = section;
+            const createdSection = await api.brief.create(project.id, sectionData);
             for (const item of items) {
               await api.items.create({
-                parentId: createdGoal.id,
-                parentType: "goal",
+                parentId: createdSection.id,
+                parentType: "brief",
                 ...item,
               });
             }
           }
 
-          for (const bucket of template.lab) {
-            const { items, ...bucketData } = bucket;
-            const createdBucket = await api.lab.create(project.id, bucketData);
+          for (const category of template.discovery) {
+            const { items, ...categoryData } = category;
+            const createdCategory = await api.discovery.create(project.id, categoryData);
             for (const item of items) {
               await api.items.create({
-                parentId: createdBucket.id,
-                parentType: "labBucket",
+                parentId: createdCategory.id,
+                parentType: "discovery",
                 ...item,
               });
             }
@@ -187,7 +187,7 @@ export function Header() {
             }
           }
 
-          const pageTypes = ["dashboard_page", "goal_page", "lab_page", "deliverable_page"];
+          const pageTypes = ["dashboard_page", "brief_page", "discovery_page", "deliverable_page"];
           for (const pageType of pageTypes) {
             await api.messages.create({
               parentId: project.id,
@@ -222,13 +222,13 @@ export function Header() {
 
   const navItems = [
     { label: "Dashboard", path: "/dashboard" },
-    { label: "Goals", path: "/" },
-    { label: "Lab", path: "/lab" },
+    { label: "Brief", path: "/" },
+    { label: "Discovery", path: "/discovery" },
     { label: "Deliverables", path: "/deliverables" },
   ];
 
   return (
-    <header className="h-[60px] border-b bg-background flex items-center justify-between px-6 fixed top-0 w-full z-50">
+    <header className="h-[60px] border-b bg-white flex items-center justify-between px-6 fixed top-0 w-full z-50">
       <div className="flex items-center gap-3 font-bold text-lg tracking-tight font-heading">
         <div className="w-8 h-8 bg-primary rounded-md flex items-center justify-center text-primary-foreground" data-testid="img-app-mark">
           A

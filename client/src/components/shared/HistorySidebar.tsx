@@ -6,10 +6,10 @@ import { motion } from "framer-motion";
 export function HistorySidebar({ compact = false }: { compact?: boolean }) {
   const historyItems = [
     { id: 1, action: "Added Context", time: "2m ago", details: "Lease expiry update" },
-    { id: 2, action: "Goal Refined", time: "15m ago", details: "Success criteria set" },
-    { id: 3, action: "Saved to Lab", time: "1h ago", details: "Competitor map link" },
+    { id: 2, action: "Brief Refined", time: "15m ago", details: "Success criteria set" },
+    { id: 3, action: "Saved to Discovery", time: "1h ago", details: "Competitor map link" },
     { id: 4, action: "Session Started", time: "2h ago", details: "Office relocation" },
-    { id: 5, action: "Viewed Goal", time: "3h ago", details: "Context" },
+    { id: 5, action: "Viewed Brief", time: "3h ago", details: "Context" },
     { id: 6, action: "Session Ended", time: "Yesterday", details: "Drafting" },
   ];
 

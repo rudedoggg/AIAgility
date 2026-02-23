@@ -32,8 +32,8 @@ export default function NotificationsPage() {
 
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0">
-                <div className="text-sm font-semibold" data-testid="text-notif-goals-title">Goals reminders</div>
-                <div className="text-sm text-muted-foreground" data-testid="text-notif-goals-desc">Remind me when goals are missing constraints or owners.</div>
+                <div className="text-sm font-semibold" data-testid="text-notif-goals-title">Brief reminders</div>
+                <div className="text-sm text-muted-foreground" data-testid="text-notif-goals-desc">Remind me when brief sections are missing constraints or owners.</div>
               </div>
               <Switch data-testid="switch-notif-goals" defaultChecked />
             </div>

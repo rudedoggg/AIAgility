@@ -1,4 +1,4 @@
-import { Bucket, Deliverable, Message, Section } from "@/lib/types";
+import { Category, Deliverable, Message, Section } from "@/lib/types";
 
 type ProjectId = string;
 
@@ -10,7 +10,7 @@ type ProjectTemplate = {
     nextSteps: string[];
   };
   executiveSummary: string;
-  goals: {
+  brief: {
     navTitle: string;
     summary: {
       status: string;
@@ -20,7 +20,7 @@ type ProjectTemplate = {
     };
     sections: Section[];
   };
-  lab: {
+  discovery: {
     navTitle: string;
     summary: {
       status: string;
@@ -28,7 +28,7 @@ type ProjectTemplate = {
       undone: string[];
       nextSteps: string[];
     };
-    buckets: Bucket[];
+    categories: Category[];
   };
   deliverables: {
     navTitle: string;
@@ -46,7 +46,7 @@ const baseMessages: Message[] = [
   {
     id: "1",
     role: "ai",
-    content: "I’m ready. What’s the decision or outcome you’re driving toward?",
+    content: "I'm ready. What's the decision or outcome you're driving toward?",
     timestamp: "10:00 AM",
   },
   {
@@ -59,7 +59,7 @@ const baseMessages: Message[] = [
     id: "3",
     role: "ai",
     content:
-      "Got it. I’ll help define goals, collect research, and produce deliverables. When I suggest content, you can save it to a specific bucket.",
+      "Got it. I'll help define the brief, collect research, and produce deliverables. When I suggest content, you can save it to a specific section, category, or asset.",
     timestamp: "10:02 AM",
     hasSaveableContent: true,
   },
@@ -72,13 +72,13 @@ function executiveSummaryFor(projectName: string) {
 Give me a two-page executive summary of this project.
 
 ## Summary (Draft)
-This project is currently in early structuring. The goal is to clarify scope, establish decision criteria, collect the right evidence, and produce decision-ready deliverables. The workspace is organized into Goals (what “good” looks like), Lab (evidence and knowledge buckets), and Deliverables (outputs for stakeholders).
+This project is currently in early structuring. The goal is to clarify scope, establish decision criteria, collect the right evidence, and produce decision-ready deliverables. The workspace is organized into Brief (sections defining what "good" looks like), Discovery (categories of evidence and knowledge), and Deliverables (assets for stakeholders).
 
-Over the next iterations, the main focus is to tighten the feedback loop between new evidence and updated deliverables. The system supports two layers of conversation: a global thread that can reference the entire page, and bucket-scoped threads that are constrained to the bucket’s attachments and local history.
+Over the next iterations, the main focus is to tighten the feedback loop between new evidence and updated deliverables. The system supports two layers of conversation: a global thread that can reference the entire page, and scoped threads that are constrained to a section's, category's, or asset's attachments and local history.
 
 ## Near-Term Next Steps
 1. Confirm objective and non-negotiable constraints.
-2. Populate research buckets with the minimum viable evidence.
+2. Populate research categories with the minimum viable evidence.
 3. Produce a first-pass deliverable draft and iterate.
 `;
 }
@@ -93,10 +93,10 @@ export function getProjectTemplates() {
         nextSteps: ["Lock evaluation criteria", "Gather 3 location options"],
       },
       executiveSummary: executiveSummaryFor("Office Location Decision"),
-      goals: {
-        navTitle: "Project Goals",
+      brief: {
+        navTitle: "Sections",
         summary: {
-          status: "Goals are partially defined. The objective is clear; constraints need numbers.",
+          status: "Brief is partially defined. The objective is clear; constraints need numbers.",
           done: ["Context defined", "Objective drafted"],
           undone: ["Stakeholder list incomplete", "Financial constraints undefined"],
           nextSteps: ["Confirm budget", "Confirm stakeholder list"],
@@ -153,15 +153,15 @@ export function getProjectTemplates() {
           },
         ],
       },
-      lab: {
-        navTitle: "Knowledge Buckets",
+      discovery: {
+        navTitle: "Categories",
         summary: {
           status: "Research phase active. Market context exists; team preferences need data.",
           done: ["Pulled market overview"],
           undone: ["Collect employee commute inputs"],
           nextSteps: ["Add 3 candidate locations", "Summarize commute impacts"],
         },
-        buckets: [
+        categories: [
           {
             id: "research",
             name: "Market Research",
@@ -180,7 +180,7 @@ export function getProjectTemplates() {
         ],
       },
       deliverables: {
-        navTitle: "Deliverables",
+        navTitle: "Assets",
         summary: {
           status: "Drafting phase. Recommendation memo structure exists; analysis needs evidence.",
           done: ["Memo outline created"],
@@ -225,8 +225,8 @@ export function getProjectTemplates() {
         nextSteps: ["Run baseline model", "Document assumptions"],
       },
       executiveSummary: executiveSummaryFor("Commute Impact Study"),
-      goals: {
-        navTitle: "Project Goals",
+      brief: {
+        navTitle: "Sections",
         summary: {
           status: "Objective is defined as a model. Constraints are mostly technical/data-related.",
           done: ["Drafted research question"],
@@ -281,15 +281,15 @@ export function getProjectTemplates() {
           },
         ],
       },
-      lab: {
-        navTitle: "Knowledge Buckets",
+      discovery: {
+        navTitle: "Categories",
         summary: {
           status: "Evidence collection in progress. Data sources exist; joins/cleaning pending.",
           done: ["Located HRIS export"],
           undone: ["Geocoding approach", "Transit time estimates"],
           nextSteps: ["Define pipeline", "Upload sample dataset"],
         },
-        buckets: [
+        categories: [
           {
             id: "research",
             name: "Data Sources",
@@ -308,7 +308,7 @@ export function getProjectTemplates() {
         ],
       },
       deliverables: {
-        navTitle: "Deliverables",
+        navTitle: "Assets",
         summary: {
           status: "Deliverables are in pre-draft. Waiting on baseline model outputs.",
           done: ["Outlined slide structure"],
@@ -350,8 +350,8 @@ export function getProjectTemplates() {
         nextSteps: ["Draft v1", "Run review"],
       },
       executiveSummary: executiveSummaryFor("Board Memo Draft"),
-      goals: {
-        navTitle: "Project Goals",
+      brief: {
+        navTitle: "Sections",
         summary: {
           status: "Goal is a strong narrative: decision, rationale, risks, and next steps.",
           done: ["Drafted memo outline"],
@@ -366,7 +366,7 @@ export function getProjectTemplates() {
             completeness: 55,
             totalItems: 6,
             completedItems: 3,
-            content: "We need a crisp narrative that’s decision-ready and defensible.",
+            content: "We need a crisp narrative that's decision-ready and defensible.",
             items: [{ id: "p3-g-1", type: "note", title: "Board expectations", preview: "", date: "Feb 10" }],
             isOpen: true,
           },
@@ -405,15 +405,15 @@ export function getProjectTemplates() {
           },
         ],
       },
-      lab: {
-        navTitle: "Knowledge Buckets",
+      discovery: {
+        navTitle: "Categories",
         summary: {
           status: "Inputs exist, but need consolidation into a clean appendix.",
           done: ["Collected edits"],
           undone: ["Finalize comps", "Add risk notes"],
           nextSteps: ["Clean appendix", "Summarize key evidence"],
         },
-        buckets: [
+        categories: [
           {
             id: "research",
             name: "Evidence + Appendix",
@@ -432,7 +432,7 @@ export function getProjectTemplates() {
         ],
       },
       deliverables: {
-        navTitle: "Deliverables",
+        navTitle: "Assets",
         summary: {
           status: "Memo is drafting. Needs executive summary + risks + appendix references.",
           done: ["Outline ready"],

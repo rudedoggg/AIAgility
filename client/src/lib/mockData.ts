@@ -1,4 +1,4 @@
-import { Message, Section, Bucket, Deliverable } from './types';
+import { Message, Section, Category, Deliverable } from './types';
 
 export const mockMessages: Message[] = [
   {
@@ -69,7 +69,7 @@ export const mockSections: Section[] = [
   }
 ];
 
-export const mockBuckets: Bucket[] = [
+export const mockCategories: Category[] = [
   {
     id: 'research',
     name: 'Market Research',
