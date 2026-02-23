@@ -7,6 +7,7 @@ export type Message = {
   timestamp: string;
   hasSaveableContent?: boolean; // For the [Paperclip] push mechanic
   saved?: boolean;
+  isStreaming?: boolean;
 };
 
 export type Section = {

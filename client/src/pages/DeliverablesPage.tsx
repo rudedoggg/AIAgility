@@ -15,7 +15,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type ApiDeliverable, type ApiBucketItem, type ApiChatMessage } from "@/lib/api";
+import { api, type ApiDeliverable, type ApiBucketItem } from "@/lib/api";
 import { AppShell } from "@/components/layout/AppShell";
 import { ChatWorkspace } from "@/components/shared/ChatWorkspace";
 import { getSelectedProject, subscribeToSelectedProject } from "@/lib/projectStore";
@@ -29,7 +29,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { motion, AnimatePresence } from "framer-motion";
 import { SummaryCard } from "@/components/shared/SummaryCard";
 import { ScopedHistory } from "@/components/shared/ScopedHistory";
-import { useCoreQueries } from "@/hooks/use-core-queries";
+import { useChatStream } from "@/hooks/use-chat-stream";
 
 const ACCENT_COLORS = [
   "border-t-violet-400",
@@ -42,11 +42,65 @@ const ACCENT_COLORS = [
   "border-t-orange-400",
 ];
 
-type LocalDeliverable = Deliverable & { isOpen?: boolean; assetMessages?: Message[] };
+function DeliverableAssetChat({ deliverableId }: { deliverableId: string }) {
+  const queryClient = useQueryClient();
+  const [messages, setMessages] = useState<Message[]>([]);
+
+  const { data: bucketMsgs } = useQuery({
+    queryKey: ["/api/messages", "deliverable_asset", deliverableId],
+    queryFn: () => api.messages.list("deliverable_asset", deliverableId),
+    enabled: !!deliverableId,
+  });
+
+  useEffect(() => {
+    if (bucketMsgs) {
+      setMessages(bucketMsgs.map(m => ({
+        id: m.id,
+        role: m.role as "user" | "ai",
+        content: m.content,
+        timestamp: m.timestamp,
+        hasSaveableContent: m.hasSaveableContent,
+        saved: m.saved,
+      })));
+    }
+  }, [bucketMsgs]);
+
+  const { streamingMessage, isStreaming, sendMessage } = useChatStream({
+    parentId: deliverableId,
+    parentType: "deliverable_asset",
+  });
+
+  const displayMessages = useMemo(() => {
+    const result = [...messages];
+    if (streamingMessage) result.push(streamingMessage);
+    return result;
+  }, [messages, streamingMessage]);
+
+  const handleSend = (content: string) => {
+    const timestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    setMessages(prev => [...prev, {
+      id: `local-${Date.now()}`,
+      role: "user" as const,
+      content,
+      timestamp,
+    }]);
+    sendMessage(content);
+  };
+
+  return (
+    <ChatWorkspace
+      messages={displayMessages}
+      onSendMessage={handleSend}
+      isStreaming={isStreaming}
+      className="h-full"
+    />
+  );
+}
+
+type LocalDeliverable = Deliverable & { isOpen?: boolean };
 
 export default function DeliverablesPage() {
   const queryClient = useQueryClient();
-  const { prependContext } = useCoreQueries();
   const [activeProject, setActiveProject] = useState(getSelectedProject());
 
   const { data: apiDeliverables } = useQuery({
@@ -64,7 +118,6 @@ export default function DeliverablesPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [deliverables, setDeliverables] = useState<LocalDeliverable[]>([]);
   const [deliverableItems, setDeliverableItems] = useState<Record<string, ApiBucketItem[]>>({});
-  const [assetMessages, setAssetMessages] = useState<Record<string, Message[]>>({});
   const deliverableRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -107,17 +160,15 @@ export default function DeliverablesPage() {
             fileSizeLabel: i.fileSizeLabel || undefined,
           })),
           isOpen: openState[ad.id] ?? true,
-          assetMessages: assetMessages[ad.id] || [],
         }));
       });
     }
-  }, [apiDeliverables, deliverableItems, assetMessages]);
+  }, [apiDeliverables, deliverableItems]);
 
   useEffect(() => {
     const unsub = subscribeToSelectedProject((p) => {
       setActiveProject(p);
       setDeliverableItems({});
-      setAssetMessages({});
     });
     return () => unsub();
   }, []);
@@ -131,25 +182,6 @@ export default function DeliverablesPage() {
     }
   }, [deliverableItems]);
 
-  const fetchAssetMessages = useCallback(async (deliverableId: string) => {
-    if (assetMessages[deliverableId]) return;
-    try {
-      const msgs = await api.messages.list("deliverable_asset", deliverableId);
-      setAssetMessages(prev => ({
-        ...prev,
-        [deliverableId]: msgs.map(m => ({
-          id: m.id,
-          role: m.role as 'user' | 'ai',
-          content: m.content,
-          timestamp: m.timestamp,
-          hasSaveableContent: m.hasSaveableContent,
-          saved: m.saved,
-        })),
-      }));
-    } catch {
-    }
-  }, [assetMessages]);
-
   const toggleDeliverable = (id: string) => {
     setDeliverables(prev => prev.map(d => 
         d.id === id ? { ...d, isOpen: !d.isOpen } : d
@@ -157,7 +189,6 @@ export default function DeliverablesPage() {
     const doc = deliverables.find(d => d.id === id);
     if (doc && !doc.isOpen) {
       fetchDeliverableItems(id);
-      fetchAssetMessages(id);
     }
   };
 
@@ -204,54 +235,31 @@ export default function DeliverablesPage() {
     api.items.delete(itemId).catch(() => {});
   };
 
-  const handleSendMessage = async (content: string) => {
+  const { streamingMessage, isStreaming, sendMessage: sendPageMessage } = useChatStream({
+    parentId: activeProject.id,
+    parentType: "deliverable_page",
+  });
+
+  const displayMessages = useMemo(() => {
+    const result = [...messages];
+    if (streamingMessage) result.push(streamingMessage);
+    return result;
+  }, [messages, streamingMessage]);
+
+  const handleSendMessage = (content: string) => {
     const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
+    setMessages(prev => [...prev, {
+      id: `local-${Date.now()}`,
+      role: 'user' as const,
       content,
       timestamp,
-    };
-
-    setMessages(prev => [...prev, newMessage]);
-
-    api.messages.create({
-      parentId: activeProject.id,
-      parentType: "deliverable_page",
-      role: "user",
-      content: prependContext("deliverable_page", content),
-      timestamp,
-      hasSaveableContent: false,
-      saved: false,
-    }).catch(() => {});
-
-    setTimeout(() => {
-      const aiTimestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'ai',
-        content: "I've updated the deliverable with those details.",
-        timestamp: aiTimestamp,
-        hasSaveableContent: true,
-      };
-      setMessages(prev => [...prev, aiMessage]);
-
-      api.messages.create({
-        parentId: activeProject.id,
-        parentType: "deliverable_page",
-        role: "ai",
-        content: aiMessage.content,
-        timestamp: aiTimestamp,
-        hasSaveableContent: true,
-        saved: false,
-      }).catch(() => {});
-    }, 1000);
+    }]);
+    sendPageMessage(content);
   };
 
   const scrollToDeliverable = (id: string) => {
       setDeliverables(prev => prev.map(d => d.id === id ? { ...d, isOpen: true } : d));
       fetchDeliverableItems(id);
-      fetchAssetMessages(id);
       setTimeout(() => {
           deliverableRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 50);
@@ -344,7 +352,6 @@ export default function DeliverablesPage() {
                 items: [],
                 engaged: false,
                 isOpen: true,
-                assetMessages: [],
               };
 
               setDeliverables((prev) => [newDeliverable, ...prev]);
@@ -385,8 +392,9 @@ export default function DeliverablesPage() {
         }
         chatContent={
             <ChatWorkspace
-                messages={messages}
+                messages={displayMessages}
                 onSendMessage={handleSendMessage}
+                isStreaming={isStreaming}
                 saveDestinations={deliverables.map((d) => ({ id: d.id, label: d.title }))}
                 onSaveContent={(messageId, destinationId) => {
                     const msg = messages.find((m) => m.id === messageId);
@@ -561,62 +569,8 @@ export default function DeliverablesPage() {
                                             <div className="w-[60%] border-r border-border/50">
                                                 <div className="h-full flex flex-col">
                                                     <div className="flex-1 min-h-0">
-                                                        <ChatWorkspace
-                                                            messages={((doc.assetMessages || []) as any)}
-                                                            onSendMessage={(content) => {
-                                                                const userMsg = {
-                                                                    id: Date.now().toString(),
-                                                                    role: "user" as const,
-                                                                    content,
-                                                                    timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                                                                };
-
-                                                                const versions = (((doc.items || []) as any[]).filter((i: any) => i.type === 'doc' || i.type === 'link'));
-                                                                const current = versions[0];
-
-                                                                const contextLines = [
-                                                                    `Deliverable: ${doc.title}`,
-                                                                    doc.subtitle ? `Subtitle: ${doc.subtitle}` : null,
-                                                                    `Status: ${doc.status}`,
-                                                                    current ? `Current version: ${current.title}` : "Current version: (none yet)",
-                                                                    "Deliverable versions:",
-                                                                    ...versions.slice(0, 8).map((i: any) => `- [${i.type}] ${i.title}`),
-                                                                    "\nInstruction: This asset chat is for editing the deliverable. Propose changes as a patch or a new version.",
-                                                                ].filter(Boolean);
-
-                                                                const aiMsg = {
-                                                                    id: (Date.now() + 1).toString(),
-                                                                    role: "ai" as const,
-                                                                    content: `I'll help edit this deliverable. I'm only using this deliverable's versions + context:\n\n${contextLines.join("\n")}\n\nYou said: ${content}\n\nIf you want, reply with "save as new version" and I'll format the update to paste into a new version.`,
-                                                                    timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                                                                };
-
-                                                                setAssetMessages(prev => ({
-                                                                    ...prev,
-                                                                    [doc.id]: [...(prev[doc.id] || []), userMsg, aiMsg],
-                                                                }));
-
-                                                                api.messages.create({
-                                                                    parentId: doc.id,
-                                                                    parentType: "deliverable_asset",
-                                                                    role: "user",
-                                                                    content: prependContext("deliverable_asset", content),
-                                                                    timestamp: userMsg.timestamp,
-                                                                    hasSaveableContent: false,
-                                                                    saved: false,
-                                                                }).catch(() => {});
-
-                                                                api.messages.create({
-                                                                    parentId: doc.id,
-                                                                    parentType: "deliverable_asset",
-                                                                    role: "ai",
-                                                                    content: aiMsg.content,
-                                                                    timestamp: aiMsg.timestamp,
-                                                                    hasSaveableContent: false,
-                                                                    saved: false,
-                                                                }).catch(() => {});
-                                                            }}
-                                                            className="h-full"
+                                                        <DeliverableAssetChat
+                                                            deliverableId={doc.id}
                                                         />
                                                     </div>
                                                 </div>

@@ -1,28 +1,24 @@
 import { build as esbuild } from "esbuild";
-import { build as viteBuild } from "vite";
 import { rm, readFile } from "fs/promises";
 
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
 const allowlist = [
+  "@anthropic-ai/sdk",
   "@google/generative-ai",
+  "@supabase/supabase-js",
   "axios",
-  "connect-pg-simple",
   "cors",
   "date-fns",
   "drizzle-orm",
   "drizzle-zod",
   "express",
   "express-rate-limit",
-  "express-session",
-  "jsonwebtoken",
-  "memorystore",
+  "jose",
   "multer",
   "nanoid",
   "nodemailer",
   "openai",
-  "passport",
-  "passport-local",
   "pg",
   "stripe",
   "uuid",
@@ -32,11 +28,8 @@ const allowlist = [
   "zod-validation-error",
 ];
 
-async function buildAll() {
+async function buildServer() {
   await rm("dist", { recursive: true, force: true });
-
-  console.log("building client...");
-  await viteBuild();
 
   console.log("building server...");
   const pkg = JSON.parse(await readFile("package.json", "utf-8"));
@@ -61,7 +54,7 @@ async function buildAll() {
   });
 }
 
-buildAll().catch((err) => {
+buildServer().catch((err) => {
   console.error(err);
   process.exit(1);
 });

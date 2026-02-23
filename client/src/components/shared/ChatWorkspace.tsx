@@ -24,16 +24,17 @@ interface ChatWorkspaceProps {
   onSendMessage: (content: string) => void;
   onSaveContent?: (messageId: string, destinationId: string) => void;
   saveDestinations?: { id: string; label: string }[];
+  isStreaming?: boolean;
   className?: string;
 }
 
-export function ChatWorkspace({ messages, onSendMessage, onSaveContent, saveDestinations, className }: ChatWorkspaceProps) {
+export function ChatWorkspace({ messages, onSendMessage, onSaveContent, saveDestinations, isStreaming, className }: ChatWorkspaceProps) {
   const [input, setInput] = useState("");
   const [saveOpenFor, setSaveOpenFor] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const handleSend = () => {
-    if (!input.trim()) return;
+    if (!input.trim() || isStreaming) return;
     onSendMessage(input);
     setInput("");
   };
@@ -81,7 +82,7 @@ export function ChatWorkspace({ messages, onSendMessage, onSaveContent, saveDest
               <div className="flex-1 min-w-0">
                  <div className="flex items-start justify-between gap-4">
                      <div className="text-foreground leading-snug whitespace-pre-wrap">
-                        {msg.content}
+                        {msg.content}{msg.isStreaming && <span className="inline-block w-1.5 h-4 bg-primary/70 animate-pulse ml-0.5 align-text-bottom rounded-sm" />}
                      </div>
                      
                      {/* Metadata & Actions - Inline Right */}
@@ -155,7 +156,8 @@ export function ChatWorkspace({ messages, onSendMessage, onSaveContent, saveDest
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type a message..."
+            placeholder={isStreaming ? "Waiting for response..." : "Type a message..."}
+            disabled={isStreaming}
             className="min-h-[36px] max-h-[120px] resize-none pr-9 py-2 bg-background border-input focus-visible:ring-1 focus-visible:ring-primary shadow-sm rounded-sm text-sm leading-tight"
           />
           <div className="absolute right-1.5 bottom-1">
@@ -164,7 +166,7 @@ export function ChatWorkspace({ messages, onSendMessage, onSaveContent, saveDest
                variant="ghost"
                className={cn("h-6 w-6 transition-all rounded-sm", input.trim() ? "text-primary hover:text-primary hover:bg-primary/10" : "text-muted-foreground")}
                onClick={handleSend}
-               disabled={!input.trim()}
+               disabled={!input.trim() || isStreaming}
              >
                <ArrowUp className="w-3.5 h-3.5" />
              </Button>

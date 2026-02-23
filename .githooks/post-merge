@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# post-merge hook — syncs governance files after git pull/merge
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+# Check if any governance files changed in the merge
+GOVERNANCE_FILES="CONSTITUTION.md CLAUDE.md .cursorrules replit.md governance/global-template.md"
+CHANGED=false
+
+for file in $GOVERNANCE_FILES; do
+  # ORIG_HEAD is the pre-merge commit; HEAD is after merge
+  if git diff --name-only ORIG_HEAD HEAD -- "$file" 2>/dev/null | grep -q .; then
+    CHANGED=true
+    break
+  fi
+done
+
+if [ "$CHANGED" = true ]; then
+  echo "[hook] Governance files changed — running sync..."
+  bash "$REPO_ROOT/script/sync-governance.sh" --skip-fetch
+fi

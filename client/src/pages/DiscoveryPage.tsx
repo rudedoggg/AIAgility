@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { api, type ApiDiscoveryCategory, type ApiBucketItem, type ApiChatMessage } from "@/lib/api";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { api, type ApiDiscoveryCategory, type ApiBucketItem } from "@/lib/api";
 import {
   DndContext,
   DragEndEvent,
@@ -28,7 +28,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { motion, AnimatePresence } from "framer-motion";
 import { SummaryCard } from "@/components/shared/SummaryCard";
 import { ScopedHistory } from "@/components/shared/ScopedHistory";
-import { useCoreQueries } from "@/hooks/use-core-queries";
+import { useChatStream } from "@/hooks/use-chat-stream";
 
 const ACCENT_COLORS = [
   "border-t-violet-400",
@@ -41,12 +41,67 @@ const ACCENT_COLORS = [
   "border-t-orange-400",
 ];
 
-type CategoryWithMessages = Category & { categoryMessages: Message[] };
+function DiscoveryCategoryChat({ categoryId }: { categoryId: string }) {
+  const queryClient = useQueryClient();
+  const [messages, setMessages] = useState<Message[]>([]);
+
+  const { data: categoryMsgs } = useQuery({
+    queryKey: ["/api/messages", "discovery_category", categoryId],
+    queryFn: () => api.messages.list("discovery_category", categoryId),
+    enabled: !!categoryId,
+  });
+
+  useEffect(() => {
+    if (categoryMsgs) {
+      setMessages(categoryMsgs.map(m => ({
+        id: m.id,
+        role: m.role as "user" | "ai",
+        content: m.content,
+        timestamp: m.timestamp,
+        hasSaveableContent: m.hasSaveableContent,
+        saved: m.saved,
+      })));
+    }
+  }, [categoryMsgs]);
+
+  const { streamingMessage, isStreaming, sendMessage } = useChatStream({
+    parentId: categoryId,
+    parentType: "discovery_category",
+  });
+
+  const displayMessages = useMemo(() => {
+    const result = [...messages];
+    if (streamingMessage) result.push(streamingMessage);
+    return result;
+  }, [messages, streamingMessage]);
+
+  const handleSend = (content: string) => {
+    const timestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    setMessages(prev => [...prev, {
+      id: `local-${Date.now()}`,
+      role: "user" as const,
+      content,
+      timestamp,
+    }]);
+    sendMessage(content);
+  };
+
+  return (
+    <ChatWorkspace
+      messages={displayMessages}
+      onSendMessage={handleSend}
+      isStreaming={isStreaming}
+      className="h-full"
+    />
+  );
+}
+
+type LocalCategory = Category;
 
 export default function DiscoveryPage() {
-  const { prependContext } = useCoreQueries();
+  const queryClient = useQueryClient();
   const [activeProject, setActiveProject] = useState(getSelectedProject());
-  const [categories, setCategories] = useState<CategoryWithMessages[]>([]);
+  const [categories, setCategories] = useState<LocalCategory[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const categoryRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -76,6 +131,17 @@ export default function DiscoveryPage() {
     }
   }, [apiPageMessages]);
 
+  const { streamingMessage, isStreaming, sendMessage: sendPageMessage } = useChatStream({
+    parentId: activeProject.id,
+    parentType: "discovery_page",
+  });
+
+  const displayMessages = useMemo(() => {
+    const result = [...messages];
+    if (streamingMessage) result.push(streamingMessage);
+    return result;
+  }, [messages, streamingMessage]);
+
   useEffect(() => {
     if (!apiCategories || !Array.isArray(apiCategories)) return;
 
@@ -88,7 +154,6 @@ export default function DiscoveryPage() {
           name: ab.name,
           items: existing?.items || [],
           isOpen: existing?.isOpen || false,
-          categoryMessages: existing?.categoryMessages || [],
         };
       });
     });
@@ -108,23 +173,6 @@ export default function DiscoveryPage() {
               url: i.url || undefined,
               fileName: i.fileName || undefined,
               fileSizeLabel: i.fileSizeLabel || undefined,
-            })),
-          };
-        }));
-      }).catch(() => {});
-
-      api.messages.list("discovery_category", ab.id).then(msgs => {
-        setCategories(prev => prev.map(b => {
-          if (b.id !== ab.id) return b;
-          return {
-            ...b,
-            categoryMessages: msgs.map(m => ({
-              id: m.id,
-              role: m.role as 'user' | 'ai',
-              content: m.content,
-              timestamp: m.timestamp,
-              hasSaveableContent: m.hasSaveableContent,
-              saved: m.saved,
             })),
           };
         }));
@@ -260,7 +308,6 @@ export default function DiscoveryPage() {
                   name,
                   isOpen: true,
                   items: [],
-                  categoryMessages: [],
                 },
                 ...prev,
               ]);
@@ -294,24 +341,18 @@ export default function DiscoveryPage() {
         }
         chatContent={
             <ChatWorkspace
-                messages={messages}
+                messages={displayMessages}
                 onSendMessage={(content) => {
-                  const userMsg: Message = {
-                    id: Date.now().toString(),
-                    role: "user",
+                  const timestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+                  setMessages(prev => [...prev, {
+                    id: `local-${Date.now()}`,
+                    role: "user" as const,
                     content,
-                    timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                  };
-                  setMessages(prev => [...prev, userMsg]);
-
-                  api.messages.create({
-                    parentId: activeProject.id,
-                    parentType: "discovery_page",
-                    role: "user",
-                    content: prependContext("discovery_page", content),
-                    timestamp: userMsg.timestamp,
-                  }).catch(() => {});
+                    timestamp,
+                  }]);
+                  sendPageMessage(content);
                 }}
+                isStreaming={isStreaming}
                 saveDestinations={categories.map((b) => ({ id: b.id, label: b.name }))}
                 onSaveContent={(messageId, destinationId) => {
                     const msg = messages.find((m) => m.id === messageId);
@@ -478,57 +519,8 @@ export default function DiscoveryPage() {
                                             <div className="w-[60%] border-r border-border/50">
                                                 <div className="h-full flex flex-col">
                                                     <div className="flex-1 min-h-0">
-                                                        <ChatWorkspace
-                                                            messages={(category.categoryMessages || []) as any}
-                                                            onSendMessage={(content) => {
-                                                                const userMsg: Message = {
-                                                                    id: Date.now().toString(),
-                                                                    role: "user",
-                                                                    content,
-                                                                    timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                                                                };
-
-                                                                const contextLines = [
-                                                                    `Category: ${category.name}`,
-                                                                    "Attachments:",
-                                                                    ...((category.items || []).slice(0, 8).map((i) => `- [${i.type}] ${i.title}`)),
-                                                                ].filter(Boolean);
-
-                                                                const aiMsg: Message = {
-                                                                    id: (Date.now() + 1).toString(),
-                                                                    role: "ai",
-                                                                    content: `Got it. I'm only using this category's context:\n\n${contextLines.join("\n")}\n\nYou said: ${content}`,
-                                                                    timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                                                                };
-
-                                                                setCategories((prev) =>
-                                                                    prev.map((b) =>
-                                                                        b.id === category.id
-                                                                            ? {
-                                                                                  ...b,
-                                                                                  categoryMessages: [...(b.categoryMessages || []), userMsg, aiMsg],
-                                                                              }
-                                                                            : b
-                                                                    )
-                                                                );
-
-                                                                api.messages.create({
-                                                                  parentId: category.id,
-                                                                  parentType: "discovery_category",
-                                                                  role: "user",
-                                                                  content: prependContext("discovery_category", content),
-                                                                  timestamp: userMsg.timestamp,
-                                                                }).catch(() => {});
-
-                                                                api.messages.create({
-                                                                  parentId: category.id,
-                                                                  parentType: "discovery_category",
-                                                                  role: "ai",
-                                                                  content: aiMsg.content,
-                                                                  timestamp: aiMsg.timestamp,
-                                                                }).catch(() => {});
-                                                            }}
-                                                            className="h-full"
+                                                        <DiscoveryCategoryChat
+                                                            categoryId={category.id}
                                                         />
                                                     </div>
                                                 </div>

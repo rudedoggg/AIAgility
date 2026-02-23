@@ -15,7 +15,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type ApiBriefSection, type ApiBucketItem, type ApiChatMessage } from "@/lib/api";
+import { api, type ApiBriefSection, type ApiBucketItem } from "@/lib/api";
 import { AppShell } from "@/components/layout/AppShell";
 import { ChatWorkspace } from "@/components/shared/ChatWorkspace";
 import { getSelectedProject, subscribeToSelectedProject } from "@/lib/projectStore";
@@ -32,7 +32,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { motion, AnimatePresence } from "framer-motion";
 import { SummaryCard } from "@/components/shared/SummaryCard";
 import { ScopedHistory } from "@/components/shared/ScopedHistory";
-import { useCoreQueries } from "@/hooks/use-core-queries";
+import { useChatStream } from "@/hooks/use-chat-stream";
 
 const ACCENT_COLORS = [
   "border-t-violet-400",
@@ -55,11 +55,65 @@ function getSectionIcon(id: string) {
     }
 }
 
-type LocalSection = Section & { sectionMessages?: Message[] };
+type LocalSection = Section;
+
+function BriefSectionChat({ sectionId, sectionName }: { sectionId: string; sectionName: string }) {
+  const queryClient = useQueryClient();
+  const [messages, setMessages] = useState<Message[]>([]);
+
+  const { data: bucketMsgs } = useQuery({
+    queryKey: ["/api/messages", "brief_section", sectionId],
+    queryFn: () => api.messages.list("brief_section", sectionId),
+    enabled: !!sectionId,
+  });
+
+  useEffect(() => {
+    if (bucketMsgs) {
+      setMessages(bucketMsgs.map(m => ({
+        id: m.id,
+        role: m.role as "user" | "ai",
+        content: m.content,
+        timestamp: m.timestamp,
+        hasSaveableContent: m.hasSaveableContent,
+        saved: m.saved,
+      })));
+    }
+  }, [bucketMsgs]);
+
+  const { streamingMessage, isStreaming, sendMessage } = useChatStream({
+    parentId: sectionId,
+    parentType: "brief_section",
+  });
+
+  const displayMessages = useMemo(() => {
+    const result = [...messages];
+    if (streamingMessage) result.push(streamingMessage);
+    return result;
+  }, [messages, streamingMessage]);
+
+  const handleSend = (content: string) => {
+    const timestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    setMessages(prev => [...prev, {
+      id: `local-${Date.now()}`,
+      role: "user" as const,
+      content,
+      timestamp,
+    }]);
+    sendMessage(content);
+  };
+
+  return (
+    <ChatWorkspace
+      messages={displayMessages}
+      onSendMessage={handleSend}
+      isStreaming={isStreaming}
+      className="h-full"
+    />
+  );
+}
 
 export default function BriefPage() {
   const queryClient = useQueryClient();
-  const { prependContext } = useCoreQueries();
   const [activeProject, setActiveProject] = useState(getSelectedProject());
 
   const { data: briefSections } = useQuery({
@@ -83,7 +137,6 @@ export default function BriefPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [sections, setSections] = useState<LocalSection[]>([]);
   const [sectionItems, setSectionItems] = useState<Record<string, ApiBucketItem[]>>({});
-  const [sectionMessages, setSectionMessages] = useState<Record<string, Message[]>>({});
   const sectionRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -125,17 +178,15 @@ export default function BriefPage() {
             fileSizeLabel: i.fileSizeLabel || undefined,
           })),
           isOpen: openState[gs.id] || false,
-          sectionMessages: sectionMessages[gs.id] || [],
         }));
       });
     }
-  }, [briefSections, sectionItems, sectionMessages]);
+  }, [briefSections, sectionItems]);
 
   useEffect(() => {
     const unsub = subscribeToSelectedProject((p) => {
       setActiveProject(p);
       setSectionItems({});
-      setSectionMessages({});
     });
     return () => unsub();
   }, []);
@@ -149,67 +200,26 @@ export default function BriefPage() {
     }
   }, [sectionItems]);
 
-  const fetchSectionMessages = useCallback(async (sectionId: string) => {
-    if (sectionMessages[sectionId]) return;
-    try {
-      const msgs = await api.messages.list("brief_section", sectionId);
-      setSectionMessages(prev => ({
-        ...prev,
-        [sectionId]: msgs.map(m => ({
-          id: m.id,
-          role: m.role as 'user' | 'ai',
-          content: m.content,
-          timestamp: m.timestamp,
-          hasSaveableContent: m.hasSaveableContent,
-          saved: m.saved,
-        })),
-      }));
-    } catch {
-    }
-  }, [sectionMessages]);
+  const { streamingMessage, isStreaming, sendMessage: sendPageMessage } = useChatStream({
+    parentId: activeProject.id,
+    parentType: "brief_page",
+  });
 
-  const handleSendMessage = async (content: string) => {
+  const displayMessages = useMemo(() => {
+    const result = [...messages];
+    if (streamingMessage) result.push(streamingMessage);
+    return result;
+  }, [messages, streamingMessage]);
+
+  const handleSendMessage = (content: string) => {
     const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
+    setMessages(prev => [...prev, {
+      id: `local-${Date.now()}`,
+      role: 'user' as const,
       content,
       timestamp,
-    };
-    
-    setMessages(prev => [...prev, newMessage]);
-
-    api.messages.create({
-      parentId: activeProject.id,
-      parentType: "brief_page",
-      role: "user",
-      content: prependContext("brief_page", content),
-      timestamp,
-      hasSaveableContent: false,
-      saved: false,
-    }).catch(() => {});
-
-    setTimeout(() => {
-        const aiTimestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const aiMessage: Message = {
-            id: (Date.now() + 1).toString(),
-            role: 'ai',
-            content: "I've updated the section with those details.",
-            timestamp: aiTimestamp,
-            hasSaveableContent: true
-        };
-        setMessages(prev => [...prev, aiMessage]);
-
-        api.messages.create({
-          parentId: activeProject.id,
-          parentType: "brief_page",
-          role: "ai",
-          content: aiMessage.content,
-          timestamp: aiTimestamp,
-          hasSaveableContent: true,
-          saved: false,
-        }).catch(() => {});
-    }, 1000);
+    }]);
+    sendPageMessage(content);
   };
 
   const toggleSection = (id: string) => {
@@ -218,7 +228,6 @@ export default function BriefPage() {
           const willOpen = !s.isOpen;
           if (willOpen) {
             fetchSectionItems(id);
-            fetchSectionMessages(id);
           }
           return { ...s, isOpen: willOpen };
         }
@@ -258,7 +267,6 @@ export default function BriefPage() {
       setSections(prev => prev.map(s => {
         if (s.id === id && !s.isOpen) {
           fetchSectionItems(id);
-          fetchSectionMessages(id);
           return { ...s, isOpen: true };
         }
         return s;
@@ -335,7 +343,6 @@ export default function BriefPage() {
       content: "",
       items: [],
       isOpen: true,
-      sectionMessages: [],
     };
 
     setSections((prev) => [newSection, ...prev]);
@@ -390,11 +397,11 @@ export default function BriefPage() {
   const getSectionItemsList = (sectionId: string) => sectionItems[sectionId] || [];
 
   return (
-    <AppShell 
-        navContent={SidebarContent} 
+    <AppShell
+        navContent={SidebarContent}
         navTitle="Sections"
         statusContent={
-            <SummaryCard 
+            <SummaryCard
                 title="Brief Status"
                 status={summaryStatus}
                 done={summaryDone}
@@ -403,9 +410,10 @@ export default function BriefPage() {
             />
         }
         chatContent={
-            <ChatWorkspace 
-                messages={messages} 
+            <ChatWorkspace
+                messages={displayMessages}
                 onSendMessage={handleSendMessage}
+                isStreaming={isStreaming}
                 saveDestinations={sections.map((s) => ({ id: s.id, label: s.genericName }))}
                 onSaveContent={(messageId, destinationId) => {
                     const msg = messages.find((m) => m.id === messageId);
@@ -436,7 +444,7 @@ export default function BriefPage() {
                         const items = getSectionItemsList(section.id);
                         return (
                         <div key={section.id} ref={el => { if (el) sectionRefs.current[section.id] = el; }} className={`bg-background rounded-lg shadow-sm border border-border/40 border-t-[3px] ${ACCENT_COLORS[index % ACCENT_COLORS.length]}`}>
-                            <div 
+                            <div
                                 className="flex items-center justify-between px-6 py-3 cursor-pointer hover:bg-muted/5 transition-colors group"
                                 onClick={() => toggleSection(section.id)}
                             >
@@ -450,8 +458,8 @@ export default function BriefPage() {
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden" data-testid={`progress-${section.id}`}>
-                                        <div 
-                                            className="h-full bg-primary/80" 
+                                        <div
+                                            className="h-full bg-primary/80"
                                             style={{
                                                 width: `${getProgressPercent({
                                                     explicitPercent: section.completeness,
@@ -561,7 +569,7 @@ export default function BriefPage() {
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <AnimatePresence initial={false}>
                                 {section.isOpen && (
                                     <motion.div
@@ -575,58 +583,9 @@ export default function BriefPage() {
                                             <div className="w-[60%] border-r border-border/50">
                                                 <div className="h-full flex flex-col">
                                                     <div className="flex-1 min-h-0">
-                                                        <ChatWorkspace
-                                                            messages={(sectionMessages[section.id] || []) as any}
-                                                            onSendMessage={(content) => {
-                                                                const timestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-                                                                const userMsg: Message = {
-                                                                    id: Date.now().toString(),
-                                                                    role: "user",
-                                                                    content,
-                                                                    timestamp,
-                                                                };
-
-                                                                const contextLines = [
-                                                                    `Brief Section: ${section.genericName}`,
-                                                                    section.subtitle ? `Subtitle: ${section.subtitle}` : null,
-                                                                    "Attachments:",
-                                                                    ...(items.slice(0, 8).map((i) => `- [${i.type}] ${i.title}`)),
-                                                                ].filter(Boolean);
-
-                                                                const aiTimestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-                                                                const aiMsg: Message = {
-                                                                    id: (Date.now() + 1).toString(),
-                                                                    role: "ai",
-                                                                    content: `Got it. I'm only using this section's context:\n\n${contextLines.join("\n")}\n\nYou said: ${content}`,
-                                                                    timestamp: aiTimestamp,
-                                                                };
-
-                                                                setSectionMessages(prev => ({
-                                                                    ...prev,
-                                                                    [section.id]: [...(prev[section.id] || []), userMsg, aiMsg],
-                                                                }));
-
-                                                                api.messages.create({
-                                                                  parentId: section.id,
-                                                                  parentType: "brief_section",
-                                                                  role: "user",
-                                                                  content: prependContext("brief_section", content),
-                                                                  timestamp,
-                                                                  hasSaveableContent: false,
-                                                                  saved: false,
-                                                                }).catch(() => {});
-
-                                                                api.messages.create({
-                                                                  parentId: section.id,
-                                                                  parentType: "brief_section",
-                                                                  role: "ai",
-                                                                  content: aiMsg.content,
-                                                                  timestamp: aiTimestamp,
-                                                                  hasSaveableContent: false,
-                                                                  saved: false,
-                                                                }).catch(() => {});
-                                                            }}
-                                                            className="h-full"
+                                                        <BriefSectionChat
+                                                            sectionId={section.id}
+                                                            sectionName={section.genericName}
                                                         />
                                                     </div>
                                                 </div>
@@ -677,7 +636,7 @@ export default function BriefPage() {
                                                     </div>
                                                 </div>
                                             </div>
-                                            
+
                                             {/* Right History Column */}
                                             <div className="w-[20%] bg-muted/5">
                                                 <ScopedHistory />
@@ -689,7 +648,7 @@ export default function BriefPage() {
                         </div>
                         );
                     })}
-                    
+
                     <div className="p-8 text-center">
                         <Button variant="outline" className="text-muted-foreground border-dashed">
                             Add New Brief Section

@@ -3,6 +3,7 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import { useAuth } from "@/hooks/use-auth";
 import BriefPage from "@/pages/BriefPage";
 import DiscoveryPage from "@/pages/DiscoveryPage";
@@ -19,6 +20,7 @@ import SecurityPage from "@/pages/SecurityPage";
 import LandingPage from "@/pages/LandingPage";
 import AdminPage from "@/pages/AdminPage";
 import CoreQsPage from "@/pages/CoreQsPage";
+import StyleGuidePage from "@/pages/StyleGuidePage";
 import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
 
@@ -42,6 +44,7 @@ function AuthenticatedRouter() {
 
       <Route path="/admin" component={AdminPage} />
       <Route path="/admin/coreqs" component={CoreQsPage} />
+      <Route path="/admin/style-guide" component={StyleGuidePage} />
 
       <Route component={NotFound} />
     </Switch>
@@ -68,12 +71,14 @@ function AppContent() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <AppContent />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <AppContent />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 

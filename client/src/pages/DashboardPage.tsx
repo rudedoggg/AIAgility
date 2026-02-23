@@ -9,7 +9,7 @@ import { getSelectedProject, subscribeToSelectedProject } from "@/lib/projectSto
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type ApiProject } from "@/lib/api";
 import { Message } from "@/lib/types";
-import { useCoreQueries } from "@/hooks/use-core-queries";
+import { useChatStream } from "@/hooks/use-chat-stream";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -18,7 +18,6 @@ import {
 
 export default function DashboardPage() {
   const queryClient = useQueryClient();
-  const { prependContext } = useCoreQueries();
 
   const { data: projects = [] } = useQuery<ApiProject[]>({
     queryKey: ["/api/projects"],
@@ -62,6 +61,17 @@ export default function DashboardPage() {
   const executiveSummary = activeProject?.executiveSummary || "";
   const dashboardStatus = activeProject?.dashboardStatus;
 
+  const { streamingMessage, isStreaming, sendMessage } = useChatStream({
+    parentId: activeProjectId,
+    parentType: "dashboard_page",
+  });
+
+  const displayMessages = useMemo(() => {
+    const result = [...messages];
+    if (streamingMessage) result.push(streamingMessage);
+    return result;
+  }, [messages, streamingMessage]);
+
   const refreshMutation = useMutation({
     mutationFn: async () => {
       if (!activeProject) return;
@@ -75,50 +85,16 @@ export default function DashboardPage() {
     },
   });
 
-  const handleSendMessage = async (content: string) => {
+  const handleSendMessage = (content: string) => {
     const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const newMessage: Message = {
-      id: Date.now().toString(),
+      id: `local-${Date.now()}`,
       role: 'user',
       content,
       timestamp,
     };
-
     setMessages(prev => [...prev, newMessage]);
-
-    if (!activeProjectId) return;
-
-    api.messages.create({
-      parentId: activeProjectId,
-      parentType: "dashboard_page",
-      role: "user",
-      content: prependContext("dashboard_page", content),
-      timestamp,
-      hasSaveableContent: false,
-      saved: false,
-    }).catch(() => {});
-
-    setTimeout(() => {
-      const aiTimestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'ai',
-        content: "I've noted that for the project dashboard.",
-        timestamp: aiTimestamp,
-        hasSaveableContent: false,
-      };
-      setMessages(prev => [...prev, aiMessage]);
-
-      api.messages.create({
-        parentId: activeProjectId,
-        parentType: "dashboard_page",
-        role: "ai",
-        content: aiMessage.content,
-        timestamp: aiTimestamp,
-        hasSaveableContent: false,
-        saved: false,
-      }).catch(() => {});
-    }, 1000);
+    sendMessage(content);
   };
 
   return (
@@ -199,8 +175,9 @@ export default function DashboardPage() {
             <ResizablePanel defaultSize={40} minSize={25}>
               <div className="h-full bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden flex flex-col">
                 <ChatWorkspace
-                  messages={messages}
+                  messages={displayMessages}
                   onSendMessage={handleSendMessage}
+                  isStreaming={isStreaming}
                   className="flex-1 min-h-0"
                 />
               </div>

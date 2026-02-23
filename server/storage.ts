@@ -41,16 +41,19 @@ export interface IStorage {
   reorderDeliverables(projectId: string, ids: string[]): Promise<void>;
 
   listBucketItems(parentId: string, parentType: string): Promise<BucketItem[]>;
+  getBucketItem(id: string): Promise<BucketItem | undefined>;
   createBucketItem(data: InsertBucketItem): Promise<BucketItem>;
   deleteBucketItem(id: string): Promise<void>;
 
   listChatMessages(parentId: string, parentType: string): Promise<ChatMessage[]>;
+  getChatMessage(id: string): Promise<ChatMessage | undefined>;
   createChatMessage(data: InsertChatMessage): Promise<ChatMessage>;
   updateChatMessage(id: string, data: Partial<InsertChatMessage>): Promise<ChatMessage | undefined>;
 
   getProjectIdForBrief(briefId: string): Promise<string | undefined>;
   getProjectIdForDiscoveryCategory(categoryId: string): Promise<string | undefined>;
   getProjectIdForDeliverable(deliverableId: string): Promise<string | undefined>;
+  getProjectIdForParent(parentId: string, parentType: string): Promise<string | undefined>;
 
   listCoreQueries(): Promise<CoreQuery[]>;
   getCoreQuery(locationKey: string): Promise<CoreQuery | undefined>;
@@ -181,6 +184,11 @@ export class DatabaseStorage implements IStorage {
       .orderBy(asc(bucketItems.sortOrder));
   }
 
+  async getBucketItem(id: string): Promise<BucketItem | undefined> {
+    const [row] = await db.select().from(bucketItems).where(eq(bucketItems.id, id));
+    return row;
+  }
+
   async createBucketItem(data: InsertBucketItem): Promise<BucketItem> {
     const [row] = await db.insert(bucketItems).values(data).returning();
     return row;
@@ -194,6 +202,11 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(chatMessages)
       .where(and(eq(chatMessages.parentId, parentId), eq(chatMessages.parentType, parentType)))
       .orderBy(asc(chatMessages.sortOrder));
+  }
+
+  async getChatMessage(id: string): Promise<ChatMessage | undefined> {
+    const [row] = await db.select().from(chatMessages).where(eq(chatMessages.id, id));
+    return row;
   }
 
   async createChatMessage(data: InsertChatMessage): Promise<ChatMessage> {
@@ -219,6 +232,28 @@ export class DatabaseStorage implements IStorage {
   async getProjectIdForDeliverable(deliverableId: string): Promise<string | undefined> {
     const [row] = await db.select({ projectId: deliverables.projectId }).from(deliverables).where(eq(deliverables.id, deliverableId));
     return row?.projectId;
+  }
+
+  async getProjectIdForParent(parentId: string, parentType: string): Promise<string | undefined> {
+    switch (parentType) {
+      case "dashboard":
+      case "dashboard_page":
+      case "brief_page":
+      case "discovery_page":
+      case "deliverables":
+      case "deliverable_page": {
+        const project = await this.getProject(parentId);
+        return project?.id;
+      }
+      case "brief":
+        return this.getProjectIdForBrief(parentId);
+      case "discovery":
+        return this.getProjectIdForDiscoveryCategory(parentId);
+      case "deliverable":
+        return this.getProjectIdForDeliverable(parentId);
+      default:
+        return undefined;
+    }
   }
 
   async listCoreQueries(): Promise<CoreQuery[]> {

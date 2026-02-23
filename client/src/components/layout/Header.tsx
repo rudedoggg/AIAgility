@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { ChevronDown, FolderPlus, LogOut, Settings, User, Shield, MessageSquare } from "lucide-react";
+import { ChevronDown, FolderPlus, LogOut, Settings, User, Shield, MessageSquare, Sun, Moon, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getSelectedProject, setSelectedProject, subscribeToSelectedProject } from "@/lib/projectStore";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { useTheme } from "next-themes";
 import { api } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 function generateTemplateFromSnippet(projectName: string, snippet: string) {
   const cleaned = snippet.replace(/\s+/g, " ").trim();
@@ -102,7 +104,9 @@ import {
 export function Header() {
   const [location] = useLocation();
   const [projectName, setProjectName] = useState(getSelectedProject().name);
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const { theme, setTheme } = useTheme();
+  const { toast } = useToast();
 
   const userInitials = user
     ? ((user.firstName?.[0] || "") + (user.lastName?.[0] || "")).toUpperCase() || (user.email?.[0] || "?").toUpperCase()
@@ -146,54 +150,58 @@ export function Header() {
       });
 
       if (template) {
-        for (const section of template.brief) {
-          const { items, ...sectionData } = section;
-          const createdSection = await api.brief.create(project.id, sectionData);
-          for (const item of items) {
-            await api.items.create({
-              parentId: createdSection.id,
-              parentType: "brief",
-              ...item,
+        try {
+          for (const section of template.brief) {
+            const { items, ...sectionData } = section;
+            const createdSection = await api.brief.create(project.id, sectionData);
+            for (const item of items) {
+              await api.items.create({
+                parentId: createdSection.id,
+                parentType: "brief",
+                ...item,
+              });
+            }
+          }
+
+          for (const category of template.discovery) {
+            const { items, ...categoryData } = category;
+            const createdCategory = await api.discovery.create(project.id, categoryData);
+            for (const item of items) {
+              await api.items.create({
+                parentId: createdCategory.id,
+                parentType: "discovery",
+                ...item,
+              });
+            }
+          }
+
+          for (const deliverable of template.deliverables) {
+            const { items, ...delivData } = deliverable;
+            const createdDeliv = await api.deliverables.create(project.id, delivData);
+            for (const item of items) {
+              await api.items.create({
+                parentId: createdDeliv.id,
+                parentType: "deliverable",
+                ...item,
+              });
+            }
+          }
+
+          const pageTypes = ["dashboard_page", "brief_page", "discovery_page", "deliverable_page"];
+          for (const pageType of pageTypes) {
+            await api.messages.create({
+              parentId: project.id,
+              parentType: pageType,
+              role: "assistant",
+              content: `Welcome to ${name}! I'm ready to help you with your ${pageType}. Ask me anything.`,
+              timestamp: new Date().toISOString(),
+              hasSaveableContent: false,
+              saved: false,
+              sortOrder: 0,
             });
           }
-        }
-
-        for (const category of template.discovery) {
-          const { items, ...categoryData } = category;
-          const createdCategory = await api.discovery.create(project.id, categoryData);
-          for (const item of items) {
-            await api.items.create({
-              parentId: createdCategory.id,
-              parentType: "discovery",
-              ...item,
-            });
-          }
-        }
-
-        for (const deliverable of template.deliverables) {
-          const { items, ...delivData } = deliverable;
-          const createdDeliv = await api.deliverables.create(project.id, delivData);
-          for (const item of items) {
-            await api.items.create({
-              parentId: createdDeliv.id,
-              parentType: "deliverable",
-              ...item,
-            });
-          }
-        }
-
-        const pageTypes = ["dashboard", "brief", "discovery", "deliverables"];
-        for (const pageType of pageTypes) {
-          await api.messages.create({
-            parentId: project.id,
-            parentType: pageType,
-            role: "assistant",
-            content: `Welcome to ${name}! I'm ready to help you with your ${pageType}. Ask me anything.`,
-            timestamp: new Date().toISOString(),
-            hasSaveableContent: false,
-            saved: false,
-            sortOrder: 0,
-          });
+        } catch (err) {
+          toast({ title: "Warning", description: "Project created but template seeding failed. You can add content manually.", variant: "destructive" });
         }
       }
 
@@ -202,6 +210,9 @@ export function Header() {
     onSuccess: (project) => {
       queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
       setSelectedProject({ id: project.id, name: project.name });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: `Failed to create project: ${err.message}`, variant: "destructive" });
     },
   });
 
@@ -284,11 +295,10 @@ export function Header() {
         {navItems.map((item) => (
           <Link key={item.path} href={item.path}>
             <div
-              className={`px-4 py-1.5 text-sm font-medium transition-all cursor-pointer relative ${
-                location === item.path
+              className={`px-4 py-1.5 text-sm font-medium transition-all cursor-pointer relative ${location === item.path
                   ? "text-foreground"
                   : "text-muted-foreground hover:text-foreground"
-              }`}
+                }`}
               data-testid={`tab-${item.label.toLowerCase()}`}
             >
               {item.label}
@@ -301,6 +311,17 @@ export function Header() {
       </nav>
 
       <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-muted-foreground hover:text-foreground"
+          data-testid="button-theme-toggle"
+          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          aria-label="Toggle theme"
+        >
+          {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+        </Button>
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -363,10 +384,14 @@ export function Header() {
                   <MessageSquare className="w-4 h-4 mr-2" />
                   CoreQs
                 </DropdownMenuItem>
+                <DropdownMenuItem data-testid="menu-user-styleguide" onSelect={() => (window.location.href = "/admin/style-guide")}>
+                  <Palette className="w-4 h-4 mr-2" />
+                  Style Guide
+                </DropdownMenuItem>
               </>
             )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem data-testid="menu-user-signout" onSelect={() => (window.location.href = "/api/logout")}>
+            <DropdownMenuItem data-testid="menu-user-signout" onSelect={() => logout()}>
               <LogOut className="w-4 h-4 mr-2" />
               Sign out
             </DropdownMenuItem>

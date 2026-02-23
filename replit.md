@@ -1,13 +1,15 @@
 # AgilityAI — Decision-Making & Project Management Tool
 
+> **AI Agents**: Read `CONSTITUTION.md` for the full governance framework (anti-slop rules, no workarounds policy, cognitive guardrails, zero-tolerance rules, session protocol). It is the single source of truth for how you work.
+
 ## Overview
-A decision-making and project management tool with four main sections: Dashboard, Brief, Discovery, and Deliverables. Projects are selected via a header dropdown and switching projects updates all pages. Supports two levels of AI chat: global page-level and scoped conversations (section-level, category-level, or asset-level). Features user authentication via Replit Auth (OIDC) with admin and regular user roles.
+A decision-making and project management tool with four main sections: Dashboard, Brief, Discovery, and Deliverables. Projects are selected via a header dropdown and switching projects updates all pages. Supports two levels of AI chat: global page-level and scoped conversations (section-level, category-level, or asset-level). Features user authentication via Supabase Auth with JWT tokens, admin and regular user roles.
 
 ## Architecture
 - **Frontend**: React + Vite + TypeScript, Tailwind CSS + shadcn/ui, wouter routing, @tanstack/react-query for data fetching
 - **Backend**: Express.js + TypeScript
 - **Database**: PostgreSQL with Drizzle ORM
-- **Auth**: Replit Auth (OIDC) with passport, express-session, connect-pg-simple for session storage
+- **Auth**: Supabase Auth — frontend gets JWT via @supabase/supabase-js, backend verifies JWT with jsonwebtoken
 - **Data Flow**: Frontend fetches via React Query → Express API routes (protected by isAuthenticated middleware) → Drizzle storage layer → PostgreSQL
 
 ## Page-Specific Terminology
@@ -16,8 +18,7 @@ A decision-making and project management tool with four main sections: Dashboard
 - **Deliverables**: expandable areas called "Assets" (e.g., Decision Memo, Analysis Deck)
 
 ## Database Schema
-- `users` — id, email, firstName, lastName, profileImageUrl, isAdmin, createdAt, updatedAt (Replit Auth managed)
-- `sessions` — sid, sess (jsonb), expire (Replit Auth session storage)
+- `users` — id, email, firstName, lastName, profileImageUrl, isAdmin, createdAt, updatedAt (synced from Supabase Auth)
 - `projects` — id, userId (FK to users), name, summary, executiveSummary, dashboardStatus (jsonb), createdAt
 - `brief_sections` — id, projectId (FK), genericName, subtitle, completeness, totalItems, completedItems, content, sortOrder
 - `discovery_categories` — id, projectId (FK), name, sortOrder
@@ -26,22 +27,25 @@ A decision-making and project management tool with four main sections: Dashboard
 - `chat_messages` — id, parentId, parentType (brief_page/discovery_page/deliverable_page/brief_section/discovery_category/deliverable_asset/dashboard_page), role, content, timestamp, hasSaveableContent, saved, sortOrder
 
 ## Auth System
-- Replit Auth (OIDC) handles login/signup via /api/login and /api/logout
+- Supabase Auth handles login/signup on the frontend via @supabase/supabase-js
+- Frontend sends JWT as `Authorization: Bearer <token>` header on all API requests
+- Backend verifies JWT using SUPABASE_JWT_SECRET via jsonwebtoken
+- POST /api/auth/sync upserts user record after Supabase login
 - First user to register automatically becomes admin
 - Admin users can access /admin dashboard to manage users and view all projects
-- All API routes protected with isAuthenticated middleware
+- All API routes protected with isAuthenticated middleware (JWT verification)
 - Admin routes additionally protected with isAdmin middleware
 - Projects are scoped per user (each user sees only their own projects)
-- Session stored in PostgreSQL via connect-pg-simple
+- Stateless auth — no server-side sessions
 
 ## Key Files
 - `shared/schema.ts` — Drizzle schema definitions + Zod insert schemas (re-exports auth models)
-- `shared/models/auth.ts` — Users and sessions table schemas
+- `shared/models/auth.ts` — Users table schema
 - `server/db.ts` — Database connection
 - `server/storage.ts` — Storage interface (IStorage) + DatabaseStorage implementation
 - `server/routes.ts` — Express API routes (protected)
 - `server/seed.ts` — Demo data seeding (auto-seeds on first request per user)
-- `server/replit_integrations/auth/` — Auth module (setupAuth, isAuthenticated, authStorage, routes)
+- `server/auth/` — Auth module (isAuthenticated JWT middleware, isAdmin, authStorage)
 - `client/src/hooks/use-auth.ts` — React hook for authentication state
 - `client/src/lib/auth-utils.ts` — Auth error handling utilities
 - `client/src/lib/api.ts` — Frontend API client
@@ -81,7 +85,7 @@ A decision-making and project management tool with four main sections: Dashboard
 - CoreQs menu item added to admin section of Header user dropdown
 
 ## Previous Changes (Feb 14, 2026)
-- Added Replit Auth integration (OIDC) with user authentication
+- Added user authentication (originally Replit OIDC, migrated to Supabase Auth)
 - Added admin role system (first user auto-promoted to admin)
 - Added userId to projects table for per-user project isolation
 - Created landing page for unauthenticated visitors

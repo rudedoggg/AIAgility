@@ -6,12 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, FolderOpen, ShieldCheck, ShieldOff, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
 import type { User } from "@shared/models/auth";
-
-async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(url, { credentials: "include" });
-  if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
-  return res.json();
-}
+import type { Project } from "@shared/schema";
+import { fetchJson } from "@/lib/api";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function AdminPage() {
   const { user } = useAuth();
@@ -22,7 +19,7 @@ export default function AdminPage() {
     queryFn: () => fetchJson("/api/admin/users"),
   });
 
-  const { data: allProjects = [] } = useQuery<any[]>({
+  const { data: allProjects = [] } = useQuery<Project[]>({
     queryKey: ["/api/admin/projects"],
     queryFn: () => fetchJson("/api/admin/projects"),
   });
@@ -34,11 +31,7 @@ export default function AdminPage() {
 
   const toggleAdminMutation = useMutation({
     mutationFn: async (userId: string) => {
-      const res = await fetch(`/api/admin/users/${userId}/toggle-admin`, {
-        method: "PATCH",
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed");
+      const res = await apiRequest("PATCH", `/api/admin/users/${userId}/toggle-admin`);
       return res.json();
     },
     onSuccess: () => {

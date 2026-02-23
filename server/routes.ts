@@ -1,14 +1,23 @@
 import type { Express, Request, Response, RequestHandler } from "express";
 import { type Server } from "http";
+import { z } from "zod";
 import { storage } from "./storage";
 import { seedDemoData } from "./seed";
-import { isAuthenticated, authStorage } from "./replit_integrations/auth";
+import { isAuthenticated, isAdmin, authStorage } from "./auth";
 import { db } from "./db";
 import { users, projects } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
+import { getAIProvider, type AIMessage } from "./ai";
+
+const syncUserSchema = z.object({
+  email: z.string().email().nullable(),
+  firstName: z.string().max(255).nullable(),
+  lastName: z.string().max(255).nullable(),
+  profileImageUrl: z.string().url().nullable(),
+});
 
 function getUserId(req: Request): string {
-  return (req as any).user?.claims?.sub;
+  return req.userId!;
 }
 
 function param(req: Request, key: string): string {
@@ -20,18 +29,56 @@ async function verifyProjectOwnership(projectId: string, userId: string): Promis
   return !!project && project.userId === userId;
 }
 
-const isAdmin: RequestHandler = async (req, res, next) => {
-  const userId = getUserId(req);
-  if (!userId) return res.status(401).json({ message: "Unauthorized" });
-  const user = await authStorage.getUser(userId);
-  if (!user?.isAdmin) return res.status(403).json({ message: "Forbidden" });
-  next();
-};
+async function getProjectIdForChatParent(parentId: string, parentType: string): Promise<string | undefined> {
+  switch (parentType) {
+    case "dashboard_page":
+    case "brief_page":
+    case "discovery_page":
+    case "deliverable_page": {
+      const project = await storage.getProject(parentId);
+      return project?.id;
+    }
+    case "brief_section":
+      return storage.getProjectIdForBrief(parentId);
+    case "discovery_category":
+      return storage.getProjectIdForDiscoveryCategory(parentId);
+    case "deliverable_asset":
+      return storage.getProjectIdForDeliverable(parentId);
+    default:
+      return undefined;
+  }
+}
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+
+  // === AUTH SYNC (called by frontend after Supabase login) ===
+  app.post("/api/auth/sync", isAuthenticated, async (req: Request, res: Response) => {
+    const userId = getUserId(req);
+    const parsed = syncUserSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid request body", errors: parsed.error.flatten().fieldErrors });
+    }
+    const { email, firstName, lastName, profileImageUrl } = parsed.data;
+    const user = await authStorage.upsertUser({
+      id: userId,
+      email: email || null,
+      firstName: firstName || null,
+      lastName: lastName || null,
+      profileImageUrl: profileImageUrl || null,
+    });
+    res.json(user);
+  });
+
+  // === GET CURRENT USER ===
+  app.get("/api/auth/user", isAuthenticated, async (req: Request, res: Response) => {
+    const userId = getUserId(req);
+    const user = await authStorage.getUser(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.json(user);
+  });
 
   // === PROJECTS ===
   app.get("/api/projects", isAuthenticated, async (req, res) => {
@@ -191,35 +238,160 @@ export async function registerRoutes(
 
   // === BUCKET ITEMS ===
   app.get("/api/items/:parentType/:parentId", isAuthenticated, async (req, res) => {
+    const userId = getUserId(req);
+    const projectId = await storage.getProjectIdForParent(param(req, "parentId"), param(req, "parentType"));
+    if (!projectId || !await verifyProjectOwnership(projectId, userId)) return res.status(404).json({ message: "Not found" });
     const rows = await storage.listBucketItems(param(req, "parentId"), param(req, "parentType"));
     res.json(rows);
   });
 
   app.post("/api/items", isAuthenticated, async (req, res) => {
+    const userId = getUserId(req);
+    const projectId = await storage.getProjectIdForParent(req.body.parentId, req.body.parentType);
+    if (!projectId || !await verifyProjectOwnership(projectId, userId)) return res.status(404).json({ message: "Not found" });
     const row = await storage.createBucketItem(req.body);
     res.status(201).json(row);
   });
 
   app.delete("/api/items/:id", isAuthenticated, async (req, res) => {
+    const userId = getUserId(req);
+    const item = await storage.getBucketItem(param(req, "id"));
+    if (!item) return res.status(404).json({ message: "Not found" });
+    const projectId = await storage.getProjectIdForParent(item.parentId, item.parentType);
+    if (!projectId || !await verifyProjectOwnership(projectId, userId)) return res.status(404).json({ message: "Not found" });
     await storage.deleteBucketItem(param(req, "id"));
     res.status(204).end();
   });
 
   // === CHAT MESSAGES ===
   app.get("/api/messages/:parentType/:parentId", isAuthenticated, async (req, res) => {
+    const userId = getUserId(req);
+    const projectId = await storage.getProjectIdForParent(param(req, "parentId"), param(req, "parentType"));
+    if (!projectId || !await verifyProjectOwnership(projectId, userId)) return res.status(404).json({ message: "Not found" });
     const rows = await storage.listChatMessages(param(req, "parentId"), param(req, "parentType"));
     res.json(rows);
   });
 
   app.post("/api/messages", isAuthenticated, async (req, res) => {
+    const userId = getUserId(req);
+    const projectId = await storage.getProjectIdForParent(req.body.parentId, req.body.parentType);
+    if (!projectId || !await verifyProjectOwnership(projectId, userId)) return res.status(404).json({ message: "Not found" });
     const row = await storage.createChatMessage(req.body);
     res.status(201).json(row);
   });
 
   app.patch("/api/messages/:id", isAuthenticated, async (req, res) => {
+    const userId = getUserId(req);
+    const message = await storage.getChatMessage(param(req, "id"));
+    if (!message) return res.status(404).json({ message: "Not found" });
+    const projectId = await storage.getProjectIdForParent(message.parentId, message.parentType);
+    if (!projectId || !await verifyProjectOwnership(projectId, userId)) return res.status(404).json({ message: "Not found" });
     const row = await storage.updateChatMessage(param(req, "id"), req.body);
     if (!row) return res.status(404).json({ message: "Not found" });
     res.json(row);
+  });
+
+  // === AI CHAT (SSE streaming) ===
+  const chatRequestSchema = z.object({
+    parentId: z.string().min(1),
+    parentType: z.string().min(1),
+    content: z.string().min(1),
+  });
+
+  app.post("/api/chat", isAuthenticated, async (req: Request, res: Response) => {
+    const userId = getUserId(req);
+    const parsed = chatRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid request body", errors: parsed.error.flatten().fieldErrors });
+    }
+
+    const { parentId, parentType, content } = parsed.data;
+
+    const projectId = await getProjectIdForChatParent(parentId, parentType);
+    if (!projectId || !await verifyProjectOwnership(projectId, userId)) {
+      return res.status(404).json({ message: "Not found" });
+    }
+
+    // Save user message
+    const timestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const userMessage = await storage.createChatMessage({
+      parentId,
+      parentType,
+      role: "user",
+      content,
+      timestamp,
+      hasSaveableContent: false,
+      saved: false,
+    });
+
+    // Fetch conversation history (last 50 messages)
+    const history = await storage.listChatMessages(parentId, parentType);
+    const recentHistory = history.slice(-50);
+
+    // Fetch system prompt from core_queries
+    const coreQuery = await storage.getCoreQuery(parentType);
+    const systemPrompt = coreQuery?.contextQuery || "";
+
+    // Build AI messages array
+    const aiMessages: AIMessage[] = [];
+    if (systemPrompt) {
+      aiMessages.push({ role: "system", content: systemPrompt });
+    }
+    for (const msg of recentHistory) {
+      aiMessages.push({
+        role: msg.role === "user" ? "user" : "assistant",
+        content: msg.content,
+      });
+    }
+
+    // Set up SSE
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    });
+
+    let fullResponse = "";
+
+    try {
+      const provider = getAIProvider();
+      for await (const token of provider.streamCompletion(aiMessages)) {
+        fullResponse += token;
+        res.write(`data: ${JSON.stringify({ type: "token", text: token })}\n\n`);
+      }
+
+      // Save completed AI response
+      const aiTimestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      const aiMessage = await storage.createChatMessage({
+        parentId,
+        parentType,
+        role: "ai",
+        content: fullResponse,
+        timestamp: aiTimestamp,
+        hasSaveableContent: true,
+        saved: false,
+      });
+
+      res.write(`data: ${JSON.stringify({ type: "done", userMessageId: userMessage.id, aiMessageId: aiMessage.id })}\n\n`);
+    } catch (err) {
+      const errorText = err instanceof Error ? err.message : "AI provider error";
+
+      // Save error as AI message
+      const errTimestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      await storage.createChatMessage({
+        parentId,
+        parentType,
+        role: "ai",
+        content: `Sorry, I encountered an error: ${errorText}`,
+        timestamp: errTimestamp,
+        hasSaveableContent: false,
+        saved: false,
+      });
+
+      res.write(`data: ${JSON.stringify({ type: "error", message: errorText })}\n\n`);
+    }
+
+    res.end();
   });
 
   // === ADMIN ROUTES ===
