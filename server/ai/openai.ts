@@ -14,7 +14,7 @@ export class OpenAIProvider implements AIProvider {
 
   async *streamCompletion(messages: AIMessage[]): AsyncIterable<string> {
     const stream = await this.client.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-5.2",
       messages: messages.map((m) => ({
         role: m.role,
         content: m.content,
