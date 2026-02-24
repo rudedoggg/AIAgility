@@ -31,6 +31,7 @@ export default function ResetPasswordPage() {
             if (updateError) {
                 setError(updateError.message);
             } else {
+                sessionStorage.removeItem("passwordRecovery");
                 setSuccess(true);
                 setTimeout(() => setLocation("/dashboard"), 3000);
             }

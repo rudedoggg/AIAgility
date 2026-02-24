@@ -55,6 +55,7 @@ function AuthenticatedRouter() {
 
 function AppContent() {
   const { isLoading, isAuthenticated } = useAuth();
+  const isPasswordRecovery = sessionStorage.getItem("passwordRecovery") === "true";
 
   if (isLoading) {
     return (
@@ -71,6 +72,10 @@ function AppContent() {
         <Route component={LandingPage} />
       </Switch>
     );
+  }
+
+  if (isPasswordRecovery) {
+    return <ResetPasswordPage />;
   }
 
   return <AuthenticatedRouter />;
