@@ -110,9 +110,15 @@ export function useAuth() {
   });
 
   const logout = async (): Promise<void> => {
-    await supabase.auth.signOut();
-    queryClient.setQueryData(["/api/auth/user"], null);
-    queryClient.clear();
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      // Ignore signOut errors — always clear local state
+    } finally {
+      queryClient.setQueryData(["/api/auth/user"], null);
+      queryClient.clear();
+      window.location.href = "/";
+    }
   };
 
   return {
