@@ -102,7 +102,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export function Header() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const [projectName, setProjectName] = useState(getSelectedProject().name);
   const { user, logout } = useAuth();
   const { theme, setTheme } = useTheme();
@@ -338,11 +338,11 @@ export function Header() {
               Settings
             </div>
             <DropdownMenuSeparator />
-            <DropdownMenuItem data-testid="menu-settings-preferences" onSelect={() => (window.location.href = "/settings/preferences")}>Preferences</DropdownMenuItem>
-            <DropdownMenuItem data-testid="menu-settings-notifications" onSelect={() => (window.location.href = "/settings/notifications")}>Notifications</DropdownMenuItem>
-            <DropdownMenuItem data-testid="menu-settings-billing" onSelect={() => (window.location.href = "/settings/billing")}>Billing</DropdownMenuItem>
-            <DropdownMenuItem data-testid="menu-settings-projects" onSelect={() => (window.location.href = "/settings/projects")}>Projects</DropdownMenuItem>
-            <DropdownMenuItem data-testid="menu-settings-help" onSelect={() => (window.location.href = "/support")}>Help & Support</DropdownMenuItem>
+            <DropdownMenuItem data-testid="menu-settings-preferences" onSelect={() => setLocation("/settings/preferences")}>Preferences</DropdownMenuItem>
+            <DropdownMenuItem data-testid="menu-settings-notifications" onSelect={() => setLocation("/settings/notifications")}>Notifications</DropdownMenuItem>
+            <DropdownMenuItem data-testid="menu-settings-billing" onSelect={() => setLocation("/settings/billing")}>Billing</DropdownMenuItem>
+            <DropdownMenuItem data-testid="menu-settings-projects" onSelect={() => setLocation("/settings/projects")}>Projects</DropdownMenuItem>
+            <DropdownMenuItem data-testid="menu-settings-help" onSelect={() => setLocation("/support")}>Help & Support</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -367,24 +367,24 @@ export function Header() {
               <div className="text-xs text-muted-foreground" data-testid="text-user-email">{user?.email || ""}</div>
             </div>
             <DropdownMenuSeparator />
-            <DropdownMenuItem data-testid="menu-user-profile" onSelect={() => (window.location.href = "/account/profile")}>
+            <DropdownMenuItem data-testid="menu-user-profile" onSelect={() => setLocation("/account/profile")}>
               <User className="w-4 h-4 mr-2" />
               Profile
             </DropdownMenuItem>
-            <DropdownMenuItem data-testid="menu-user-account" onSelect={() => (window.location.href = "/account")}>Account</DropdownMenuItem>
-            <DropdownMenuItem data-testid="menu-user-security" onSelect={() => (window.location.href = "/account/security")}>Security</DropdownMenuItem>
+            <DropdownMenuItem data-testid="menu-user-account" onSelect={() => setLocation("/account")}>Account</DropdownMenuItem>
+            <DropdownMenuItem data-testid="menu-user-security" onSelect={() => setLocation("/account/security")}>Security</DropdownMenuItem>
             {user?.isAdmin && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem data-testid="menu-user-admin" onSelect={() => (window.location.href = "/admin")}>
+                <DropdownMenuItem data-testid="menu-user-admin" onSelect={() => setLocation("/admin")}>
                   <Shield className="w-4 h-4 mr-2" />
                   Admin Dashboard
                 </DropdownMenuItem>
-                <DropdownMenuItem data-testid="menu-user-coreqs" onSelect={() => (window.location.href = "/admin/coreqs")}>
+                <DropdownMenuItem data-testid="menu-user-coreqs" onSelect={() => setLocation("/admin/coreqs")}>
                   <MessageSquare className="w-4 h-4 mr-2" />
                   CoreQs
                 </DropdownMenuItem>
-                <DropdownMenuItem data-testid="menu-user-styleguide" onSelect={() => (window.location.href = "/admin/style-guide")}>
+                <DropdownMenuItem data-testid="menu-user-styleguide" onSelect={() => setLocation("/admin/style-guide")}>
                   <Palette className="w-4 h-4 mr-2" />
                   Style Guide
                 </DropdownMenuItem>
