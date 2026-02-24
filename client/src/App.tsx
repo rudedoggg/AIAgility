@@ -22,6 +22,7 @@ import AdminPage from "@/pages/AdminPage";
 import CoreQsPage from "@/pages/CoreQsPage";
 import StyleGuidePage from "@/pages/StyleGuidePage";
 import NotFound from "@/pages/not-found";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import { Loader2 } from "lucide-react";
 
 function AuthenticatedRouter() {
@@ -31,6 +32,7 @@ function AuthenticatedRouter() {
       <Route path="/dashboard" component={DashboardPage} />
       <Route path="/discovery" component={DiscoveryPage} />
       <Route path="/deliverables" component={DeliverablesPage} />
+      <Route path="/reset-password" component={ResetPasswordPage} />
 
       <Route path="/settings/preferences" component={PreferencesPage} />
       <Route path="/settings/notifications" component={NotificationsPage} />
@@ -63,7 +65,12 @@ function AppContent() {
   }
 
   if (!isAuthenticated) {
-    return <LandingPage />;
+    return (
+      <Switch>
+        <Route path="/reset-password" component={ResetPasswordPage} />
+        <Route component={LandingPage} />
+      </Switch>
+    );
   }
 
   return <AuthenticatedRouter />;
