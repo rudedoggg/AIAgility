@@ -89,13 +89,15 @@ fi
 TEMPLATE_CONTENT=$(cat "$TEMPLATE")
 
 # IDE config: target_path and placeholder replacement value
-declare -A IDE_TARGETS
-IDE_TARGETS["$HOME/.claude/CLAUDE.md"]="CLAUDE.md"
-IDE_TARGETS["$HOME/.codex/AGENTS.md"]="AGENTS.md"
-IDE_TARGETS["$HOME/.gemini/GEMINI.md"]="GEMINI.md"
+IDE_TARGETS=(
+  "$HOME/.claude/CLAUDE.md:CLAUDE.md"
+  "$HOME/.codex/AGENTS.md:AGENTS.md"
+  "$HOME/.gemini/GEMINI.md:GEMINI.md"
+)
 
-for target_path in "${!IDE_TARGETS[@]}"; do
-  ide_file="${IDE_TARGETS[$target_path]}"
+for target in "${IDE_TARGETS[@]}"; do
+  target_path="${target%%:*}"
+  ide_file="${target##*:}"
   target_dir="$(dirname "$target_path")"
 
   # Create directory if it doesn't exist

@@ -6,13 +6,14 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
 import heroImage from "@/assets/images/hero-dashboard.png";
 
-function AuthForm({ defaultMode = "signin" }: { defaultMode?: "signin" | "signup" }) {
-  const [mode, setMode] = useState<"signin" | "signup">(defaultMode);
+function AuthForm({ defaultMode = "signin" }: { defaultMode?: "signin" | "signup" | "forgot-password" }) {
+  const [mode, setMode] = useState<"signin" | "signup" | "forgot-password">(defaultMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [confirmationSent, setConfirmationSent] = useState(false);
+  const [recoverySent, setRecoverySent] = useState(false);
 
   async function handleSubmit(e: React.FormEvent): Promise<void> {
     e.preventDefault();
@@ -30,6 +31,15 @@ function AuthForm({ defaultMode = "signin" }: { defaultMode?: "signin" | "signup
           setError(signUpError.message);
         } else {
           setConfirmationSent(true);
+        }
+      } else if (mode === "forgot-password") {
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/reset-password`,
+        });
+        if (resetError) {
+          setError(resetError.message);
+        } else {
+          setRecoverySent(true);
         }
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -59,6 +69,20 @@ function AuthForm({ defaultMode = "signin" }: { defaultMode?: "signin" | "signup
     );
   }
 
+  if (recoverySent) {
+    return (
+      <div className="space-y-4 text-center" data-testid="auth-recovery">
+        <h3 className="text-lg font-semibold">Check your email</h3>
+        <p className="text-sm text-muted-foreground">
+          We sent a password reset link to <strong>{email}</strong>.
+        </p>
+        <Button variant="ghost" size="sm" onClick={() => { setRecoverySent(false); setMode("signin"); }}>
+          Back to sign in
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4 w-full max-w-sm" data-testid="auth-form">
       <div className="space-y-2">
@@ -73,24 +97,37 @@ function AuthForm({ defaultMode = "signin" }: { defaultMode?: "signin" | "signup
           data-testid="input-email"
         />
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
-        <Input
-          id="password"
-          type="password"
-          placeholder="Enter your password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          minLength={6}
-          data-testid="input-password"
-        />
-      </div>
+      {mode !== "forgot-password" && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="password">Password</Label>
+            {mode === "signin" && (
+              <button
+                type="button"
+                className="text-xs text-primary hover:underline"
+                onClick={() => { setMode("forgot-password"); setError(null); }}
+              >
+                Forgot password?
+              </button>
+            )}
+          </div>
+          <Input
+            id="password"
+            type="password"
+            placeholder="Enter your password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={6}
+            data-testid="input-password"
+          />
+        </div>
+      )}
       {error && (
         <p className="text-sm text-destructive" data-testid="auth-error">{error}</p>
       )}
       <Button type="submit" className="w-full" disabled={loading} data-testid="button-auth-submit">
-        {loading ? "Loading..." : mode === "signin" ? "Sign in" : "Sign up"}
+        {loading ? "Loading..." : mode === "signin" ? "Sign in" : mode === "signup" ? "Sign up" : "Send reset link"}
       </Button>
       <p className="text-sm text-center text-muted-foreground">
         {mode === "signin" ? (
@@ -99,12 +136,16 @@ function AuthForm({ defaultMode = "signin" }: { defaultMode?: "signin" | "signup
               Sign up
             </button>
           </>
-        ) : (
+        ) : mode === "signup" ? (
           <>Already have an account?{" "}
             <button type="button" className="text-primary hover:underline" onClick={() => { setMode("signin"); setError(null); }} data-testid="link-toggle-auth">
               Sign in
             </button>
           </>
+        ) : (
+          <button type="button" className="text-primary hover:underline" onClick={() => { setMode("signin"); setError(null); }}>
+            Back to sign in
+          </button>
         )}
       </p>
     </form>
@@ -169,8 +210,8 @@ export default function LandingPage() {
               </p>
               <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 <Button size="lg" className="gap-2 text-base px-6" data-testid="button-landing-cta" onClick={() => setShowAuth("signup")}>
-                    Get Started <ArrowRight className="w-4 h-4" />
-                  </Button>
+                  Get Started <ArrowRight className="w-4 h-4" />
+                </Button>
               </div>
               <div className="flex items-center gap-4 pt-2">
                 <span className="text-sm text-muted-foreground" data-testid="text-landing-trust-1">Free to use</span>
@@ -237,8 +278,8 @@ export default function LandingPage() {
               Sign up in seconds and start organizing your project today.
             </p>
             <Button size="lg" className="gap-2 text-base px-8 mt-2" data-testid="button-landing-bottom-cta" onClick={() => setShowAuth("signup")}>
-                Get Started Free <ArrowRight className="w-4 h-4" />
-              </Button>
+              Get Started Free <ArrowRight className="w-4 h-4" />
+            </Button>
           </div>
         </section>
       </main>
