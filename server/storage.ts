@@ -246,10 +246,13 @@ export class DatabaseStorage implements IStorage {
         return project?.id;
       }
       case "brief":
+      case "brief_section":
         return this.getProjectIdForBrief(parentId);
       case "discovery":
+      case "discovery_category":
         return this.getProjectIdForDiscoveryCategory(parentId);
       case "deliverable":
+      case "deliverable_asset":
         return this.getProjectIdForDeliverable(parentId);
       default:
         return undefined;

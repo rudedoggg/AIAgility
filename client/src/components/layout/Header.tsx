@@ -210,6 +210,8 @@ export function Header() {
     onSuccess: (project) => {
       queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
       setSelectedProject({ id: project.id, name: project.name });
+      setProjectName(project.name);
+      toast({ title: "Project created", description: project.name });
     },
     onError: (err: Error) => {
       toast({ title: "Error", description: `Failed to create project: ${err.message}`, variant: "destructive" });
