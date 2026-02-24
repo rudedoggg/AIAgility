@@ -79,8 +79,7 @@ export function useAuth() {
         setSession(newSession);
 
         if (event === "PASSWORD_RECOVERY") {
-          window.location.href = "/reset-password";
-          return;
+          sessionStorage.setItem("passwordRecovery", "true");
         }
         if (event === "SIGNED_IN") {
           await syncUser();
