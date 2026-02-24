@@ -78,6 +78,10 @@ export function useAuth() {
       async (event, newSession) => {
         setSession(newSession);
 
+        if (event === "PASSWORD_RECOVERY") {
+          window.location.href = "/reset-password";
+          return;
+        }
         if (event === "SIGNED_IN") {
           await syncUser();
           queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
