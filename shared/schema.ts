@@ -17,6 +17,7 @@ export const projects = pgTable("projects", {
     undone: string[];
     nextSteps: string[];
   }>().notNull().default({ status: "", done: [], undone: [], nextSteps: [] }),
+  archivedAt: timestamp("archived_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -84,7 +85,7 @@ export const coreQueries = pgTable("core_queries", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const insertProjectSchema = createInsertSchema(projects).omit({ id: true, createdAt: true });
+export const insertProjectSchema = createInsertSchema(projects).omit({ id: true, createdAt: true, archivedAt: true });
 export const insertBriefSectionSchema = createInsertSchema(briefSections).omit({ id: true });
 export const insertDiscoveryCategorySchema = createInsertSchema(discoveryCategories).omit({ id: true });
 export const insertDeliverableSchema = createInsertSchema(deliverables).omit({ id: true });

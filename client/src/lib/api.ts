@@ -12,6 +12,7 @@ export type ApiProject = {
     undone: string[];
     nextSteps: string[];
   };
+  archivedAt: string | null;
   createdAt: string;
 };
 

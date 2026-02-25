@@ -1,4 +1,4 @@
-import { eq, asc, and } from "drizzle-orm";
+import { eq, asc, and, isNull, lt } from "drizzle-orm";
 import { db } from "./db";
 import {
   projects, briefSections, discoveryCategories, deliverables, bucketItems, chatMessages, coreQueries,
@@ -17,6 +17,8 @@ export interface IStorage {
   createProject(data: InsertProject): Promise<Project>;
   updateProject(id: string, data: Partial<InsertProject>): Promise<Project | undefined>;
   deleteProject(id: string): Promise<void>;
+  restoreProject(id: string): Promise<Project | undefined>;
+  permanentlyDeleteExpiredProjects(): Promise<number>;
   listAllProjects(): Promise<Project[]>;
 
   listBriefSections(projectId: string): Promise<BriefSection[]>;
@@ -63,13 +65,13 @@ export interface IStorage {
 export class DatabaseStorage implements IStorage {
   async listProjects(userId?: string): Promise<Project[]> {
     if (userId) {
-      return db.select().from(projects).where(eq(projects.userId, userId)).orderBy(asc(projects.createdAt));
+      return db.select().from(projects).where(and(eq(projects.userId, userId), isNull(projects.archivedAt))).orderBy(asc(projects.createdAt));
     }
-    return db.select().from(projects).orderBy(asc(projects.createdAt));
+    return db.select().from(projects).where(isNull(projects.archivedAt)).orderBy(asc(projects.createdAt));
   }
 
   async listAllProjects(): Promise<Project[]> {
-    return db.select().from(projects).orderBy(asc(projects.createdAt));
+    return db.select().from(projects).where(isNull(projects.archivedAt)).orderBy(asc(projects.createdAt));
   }
 
   async getProject(id: string): Promise<Project | undefined> {
@@ -88,7 +90,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteProject(id: string): Promise<void> {
-    await db.delete(projects).where(eq(projects.id, id));
+    await db.update(projects).set({ archivedAt: new Date() }).where(eq(projects.id, id));
+  }
+
+  async restoreProject(id: string): Promise<Project | undefined> {
+    const [row] = await db.update(projects).set({ archivedAt: null }).where(eq(projects.id, id)).returning();
+    return row;
+  }
+
+  async permanentlyDeleteExpiredProjects(): Promise<number> {
+    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const deleted = await db.delete(projects).where(lt(projects.archivedAt, cutoff)).returning();
+    return deleted.length;
   }
 
   async listBriefSections(projectId: string): Promise<BriefSection[]> {
