@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { registerRoutes } from "./routes";
 import { createServer } from "http";
+import { storage } from "./storage";
 
 const app = express();
 const httpServer = createServer(app);
@@ -70,8 +71,22 @@ app.use((req, res, next) => {
   next();
 });
 
+async function runCleanup(): Promise<void> {
+  try {
+    const count = await storage.permanentlyDeleteExpiredProjects();
+    if (count > 0) {
+      log(`Permanently deleted ${count} expired archived project(s)`, "cleanup");
+    }
+  } catch (err) {
+    log(`Cleanup failed: ${(err as Error).message}`, "cleanup");
+  }
+}
+
 (async () => {
   await registerRoutes(httpServer, app);
+
+  runCleanup();
+  setInterval(runCleanup, 24 * 60 * 60 * 1000);
 
   app.use((err: Error & { status?: number; statusCode?: number }, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

@@ -1,7 +1,18 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { ChevronDown, FolderPlus, LogOut, Settings, User, Shield, MessageSquare, Sun, Moon, Palette } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ChevronDown, FolderPlus, LogOut, Settings, User, Shield, MessageSquare, Sun, Moon, Palette, Trash2 } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import type { ApiProject } from "@/lib/api";
 import { getSelectedProject, setSelectedProject, subscribeToSelectedProject } from "@/lib/projectStore";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
@@ -115,6 +126,8 @@ export function Header() {
     ? [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "User"
     : "User";
 
+  const [projectToDelete, setProjectToDelete] = useState<ApiProject | null>(null);
+
   const { data: projects = [] } = useQuery({
     queryKey: ["/api/projects"],
     queryFn: () => api.projects.list(),
@@ -218,6 +231,25 @@ export function Header() {
     },
   });
 
+  const deleteProjectMutation = useMutation({
+    mutationFn: (id: string) => api.projects.delete(id),
+    onSuccess: (_data, deletedId) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      const current = getSelectedProject();
+      if (current.id === deletedId) {
+        const remaining = projects.filter((p) => p.id !== deletedId);
+        if (remaining.length > 0) {
+          setSelectedProject({ id: remaining[0].id, name: remaining[0].name });
+          setProjectName(remaining[0].name);
+        }
+      }
+      toast({ title: "Project archived", description: "It will be permanently deleted after 30 days." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: `Failed to archive project: ${err.message}`, variant: "destructive" });
+    },
+  });
+
   useEffect(() => {
     return subscribeToSelectedProject((p) => setProjectName(p.name));
   }, []);
@@ -269,6 +301,19 @@ export function Header() {
                     active
                   </span>
                 )}
+                <button
+                  type="button"
+                  className="ml-auto p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                  data-testid={`button-delete-project-${p.id}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    setProjectToDelete(p);
+                  }}
+                  aria-label={`Archive ${p.name}`}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
               </DropdownMenuItem>
             ))}
 
@@ -400,6 +445,30 @@ export function Header() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      <AlertDialog open={!!projectToDelete} onOpenChange={(open) => { if (!open) setProjectToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive project?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{projectToDelete?.name}</strong> will be archived and permanently deleted after 30 days.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className={buttonVariants({ variant: "destructive" })}
+              onClick={() => {
+                if (projectToDelete) {
+                  deleteProjectMutation.mutate(projectToDelete.id);
+                  setProjectToDelete(null);
+                }
+              }}
+            >
+              Archive
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </header>
   );
 }
