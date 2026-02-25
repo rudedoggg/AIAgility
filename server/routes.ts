@@ -376,17 +376,21 @@ export async function registerRoutes(
     } catch (err) {
       const errorText = err instanceof Error ? err.message : "AI provider error";
 
-      // Save error as AI message
-      const errTimestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-      await storage.createChatMessage({
-        parentId,
-        parentType,
-        role: "ai",
-        content: `Sorry, I encountered an error: ${errorText}`,
-        timestamp: errTimestamp,
-        hasSaveableContent: false,
-        saved: false,
-      });
+      // Save error as AI message — wrapped so a storage failure can't prevent SSE cleanup
+      try {
+        const errTimestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        await storage.createChatMessage({
+          parentId,
+          parentType,
+          role: "ai",
+          content: `Sorry, I encountered an error: ${errorText}`,
+          timestamp: errTimestamp,
+          hasSaveableContent: false,
+          saved: false,
+        });
+      } catch {
+        // Storage failed — still send the SSE error event below
+      }
 
       res.write(`data: ${JSON.stringify({ type: "error", message: errorText })}\n\n`);
     }
