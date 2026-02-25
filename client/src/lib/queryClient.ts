@@ -2,6 +2,23 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { supabase } from "./supabase";
 import { API_BASE_URL } from "./config";
 
+let refreshPromise: Promise<boolean> | null = null;
+
+async function tryRefreshToken(): Promise<boolean> {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = (async () => {
+    try {
+      const { data, error } = await supabase.auth.refreshSession();
+      return !error && !!data.session;
+    } catch {
+      return false;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+  return refreshPromise;
+}
+
 export async function getAuthHeaders(): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
@@ -49,10 +66,17 @@ export const getQueryFn: <T>(options: {
     });
 
     if (res.status === 401) {
-      if (unauthorizedBehavior === "returnNull") {
-        return null;
+      if (unauthorizedBehavior === "returnNull") return null;
+
+      const refreshed = await tryRefreshToken();
+      if (refreshed) {
+        const newHeaders = await getAuthHeaders();
+        const retryRes = await fetch(`${API_BASE_URL}${queryKey.join("/")}`, {
+          headers: newHeaders,
+        });
+        if (retryRes.ok) return await retryRes.json();
       }
-      setTimeout(() => handleAuthError(), 0);
+
       throw new Error("Unauthorized");
     }
 
@@ -78,5 +102,4 @@ export const queryClient = new QueryClient({
 export function handleAuthError(): void {
   queryClient.setQueryData(["/api/auth/user"], null);
   queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-  supabase.auth.signOut();
 }
