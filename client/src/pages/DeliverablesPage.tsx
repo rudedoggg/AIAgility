@@ -22,6 +22,7 @@ import { getSelectedProject, subscribeToSelectedProject } from "@/lib/projectSto
 import { Message, Deliverable } from "@/lib/types";
 import { FileText, Download, Share2, CheckSquare, Edit3, ChevronRight, StickyNote, Upload, Link2, RefreshCw, Trash2, FileText as FileTextIcon } from "lucide-react";
 import { cn, getProgressPercent } from "@/lib/utils";
+import { usePromptDialog } from "@/components/shared/PromptDialogProvider";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -101,6 +102,7 @@ type LocalDeliverable = Deliverable & { isOpen?: boolean };
 
 export default function DeliverablesPage() {
   const queryClient = useQueryClient();
+  const { prompt } = usePromptDialog();
   const [activeProject, setActiveProject] = useState(getSelectedProject());
 
   const { data: apiDeliverables } = useQuery({
@@ -337,39 +339,46 @@ export default function DeliverablesPage() {
             size="sm"
             className="w-full justify-start px-3 mt-2 text-xs text-muted-foreground hover:text-primary"
             onClick={() => {
-              const name = window.prompt("New deliverable", "New deliverable");
-              if (!name) return;
+              prompt({
+                title: "New Deliverable",
+                fields: [
+                  { name: "name", label: "Deliverable name", defaultValue: "New deliverable" },
+                ],
+              }).then((result) => {
+                if (!result) return;
+                const name = result.name;
 
-              const tempId = `deliv-${Date.now()}`;
-              const newDeliverable: LocalDeliverable = {
-                id: tempId,
-                title: name,
-                subtitle: "(draft)",
-                completeness: 0,
-                status: "draft",
-                lastEdited: "Just now",
-                content: "# " + name + "\n\n(TBD)",
-                items: [],
-                engaged: false,
-                isOpen: true,
-              };
+                const tempId = `deliv-${Date.now()}`;
+                const newDeliverable: LocalDeliverable = {
+                  id: tempId,
+                  title: name,
+                  subtitle: "(draft)",
+                  completeness: 0,
+                  status: "draft",
+                  lastEdited: "Just now",
+                  content: "# " + name + "\n\n(TBD)",
+                  items: [],
+                  engaged: false,
+                  isOpen: true,
+                };
 
-              setDeliverables((prev) => [newDeliverable, ...prev]);
+                setDeliverables((prev) => [newDeliverable, ...prev]);
 
-              api.deliverables.create(activeProject.id, {
-                title: name,
-                subtitle: "(draft)",
-                completeness: 0,
-                status: "draft",
-                content: "# " + name + "\n\n(TBD)",
-                engaged: false,
-              }).then((created) => {
-                setDeliverables(prev => prev.map(d => d.id === tempId ? { ...d, id: created.id } : d));
-              }).catch(() => {});
+                api.deliverables.create(activeProject.id, {
+                  title: name,
+                  subtitle: "(draft)",
+                  completeness: 0,
+                  status: "draft",
+                  content: "# " + name + "\n\n(TBD)",
+                  engaged: false,
+                }).then((created) => {
+                  setDeliverables(prev => prev.map(d => d.id === tempId ? { ...d, id: created.id } : d));
+                }).catch(() => {});
 
-              setTimeout(() => {
-                deliverableRefs.current[tempId]?.scrollIntoView({ behavior: "smooth", block: "start" });
-              }, 50);
+                setTimeout(() => {
+                  deliverableRefs.current[tempId]?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }, 50);
+              });
             }}
           >
             + New Deliverable
@@ -461,16 +470,21 @@ export default function DeliverablesPage() {
                                             className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                const title = window.prompt(`New note in "${doc.title}"`, "Quick note");
-                                                if (!title) return;
-                                                const content = window.prompt("Note text", "");
-
-                                                addDeliverableItem(doc.id, {
-                                                    id: `${Date.now()}`,
-                                                    type: 'note',
-                                                    title,
-                                                    preview: (content || "").slice(0, 80) || "(empty)",
-                                                    date: new Date().toLocaleDateString([], { month: 'short', day: 'numeric' })
+                                                prompt({
+                                                    title: `New Note in "${doc.title}"`,
+                                                    fields: [
+                                                        { name: "title", label: "Title", defaultValue: "Quick note" },
+                                                        { name: "content", label: "Content", type: "textarea" },
+                                                    ],
+                                                }).then((result) => {
+                                                    if (!result) return;
+                                                    addDeliverableItem(doc.id, {
+                                                        id: `${Date.now()}`,
+                                                        type: 'note',
+                                                        title: result.title,
+                                                        preview: (result.content || "").slice(0, 80) || "(empty)",
+                                                        date: new Date().toLocaleDateString([], { month: 'short', day: 'numeric' })
+                                                    });
                                                 });
                                             }}
                                             aria-label="Make a note"
@@ -523,17 +537,24 @@ export default function DeliverablesPage() {
                                             className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                const url = window.prompt("Paste a link (URL)", "https://");
-                                                if (!url) return;
-                                                const title = window.prompt("Link name", url) || url;
-
-                                                addDeliverableItem(doc.id, {
-                                                    id: `${Date.now()}`,
-                                                    type: 'link',
-                                                    title,
-                                                    preview: url,
-                                                    date: new Date().toLocaleDateString([], { month: 'short', day: 'numeric' }),
-                                                    url
+                                                prompt({
+                                                    title: "Add Link",
+                                                    fields: [
+                                                        { name: "url", label: "URL", type: "url", placeholder: "https://" },
+                                                        { name: "title", label: "Link name" },
+                                                    ],
+                                                }).then((result) => {
+                                                    if (!result) return;
+                                                    const url = result.url;
+                                                    const title = result.title || url;
+                                                    addDeliverableItem(doc.id, {
+                                                        id: `${Date.now()}`,
+                                                        type: 'link',
+                                                        title,
+                                                        preview: url,
+                                                        date: new Date().toLocaleDateString([], { month: 'short', day: 'numeric' }),
+                                                        url
+                                                    });
                                                 });
                                             }}
                                             aria-label="Link a file"

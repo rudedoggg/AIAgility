@@ -23,6 +23,7 @@ import CoreQsPage from "@/pages/CoreQsPage";
 import StyleGuidePage from "@/pages/StyleGuidePage";
 import NotFound from "@/pages/not-found";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
+import { PromptDialogProvider } from "@/components/shared/PromptDialogProvider";
 import { Loader2 } from "lucide-react";
 
 function AuthenticatedRouter() {
@@ -86,8 +87,10 @@ function App() {
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <Toaster />
-          <AppContent />
+          <PromptDialogProvider>
+            <Toaster />
+            <AppContent />
+          </PromptDialogProvider>
         </TooltipProvider>
       </QueryClientProvider>
     </ThemeProvider>

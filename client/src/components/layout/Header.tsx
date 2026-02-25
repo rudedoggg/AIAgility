@@ -20,6 +20,7 @@ import { useTheme } from "next-themes";
 import { api } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { usePromptDialog } from "@/components/shared/PromptDialogProvider";
 
 function generateTemplateFromSnippet(projectName: string, snippet: string) {
   const cleaned = snippet.replace(/\s+/g, " ").trim();
@@ -118,6 +119,7 @@ export function Header() {
   const { user, logout } = useAuth();
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
+  const { prompt } = usePromptDialog();
 
   const userInitials = user
     ? ((user.firstName?.[0] || "") + (user.lastName?.[0] || "")).toUpperCase() || (user.email?.[0] || "?").toUpperCase()
@@ -322,13 +324,16 @@ export function Header() {
             <DropdownMenuItem
               data-testid="menu-project-new"
               onSelect={() => {
-                const name = window.prompt("Project name", "New Project");
-                if (!name) return;
-
-                const summary = window.prompt("Project summary (one paragraph)", "");
-                if (summary === null) return;
-
-                createProjectMutation.mutate({ name, summary });
+                prompt({
+                  title: "New Project",
+                  fields: [
+                    { name: "name", label: "Project name", defaultValue: "New Project" },
+                    { name: "summary", label: "Summary", type: "textarea", placeholder: "One paragraph summary..." },
+                  ],
+                }).then((result) => {
+                  if (!result) return;
+                  createProjectMutation.mutate({ name: result.name, summary: result.summary });
+                });
               }}
             >
               <FolderPlus className="w-4 h-4 mr-2" />

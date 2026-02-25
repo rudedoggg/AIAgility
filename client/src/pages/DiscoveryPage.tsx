@@ -22,6 +22,7 @@ import { getSelectedProject, subscribeToSelectedProject } from "@/lib/projectSto
 import { Message, Category } from "@/lib/types";
 import { FileText, Link as LinkIcon, MessageSquare, StickyNote, FolderOpen, Folder, Plus, ChevronRight, Upload, Link2, RefreshCw, Trash2 } from "lucide-react";
 import { cn, getProgressPercent } from "@/lib/utils";
+import { usePromptDialog } from "@/components/shared/PromptDialogProvider";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -100,6 +101,7 @@ type LocalCategory = Category;
 
 export default function DiscoveryPage() {
   const queryClient = useQueryClient();
+  const { prompt } = usePromptDialog();
   const [activeProject, setActiveProject] = useState(getSelectedProject());
   const [categories, setCategories] = useState<LocalCategory[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -298,27 +300,34 @@ export default function DiscoveryPage() {
             size="sm"
             className="w-full justify-start px-3 mt-2 text-xs text-muted-foreground hover:text-primary"
             onClick={() => {
-              const name = window.prompt("New category", "New category");
-              if (!name) return;
+              prompt({
+                title: "New Category",
+                fields: [
+                  { name: "name", label: "Category name", defaultValue: "New category" },
+                ],
+              }).then((result) => {
+                if (!result) return;
+                const name = result.name;
 
-              const id = `category-${Date.now()}`;
-              setCategories((prev) => [
-                {
-                  id,
-                  name,
-                  isOpen: true,
-                  items: [],
-                },
-                ...prev,
-              ]);
+                const id = `category-${Date.now()}`;
+                setCategories((prev) => [
+                  {
+                    id,
+                    name,
+                    isOpen: true,
+                    items: [],
+                  },
+                  ...prev,
+                ]);
 
-              api.discovery.create(activeProject.id, { name }).then(created => {
-                setCategories(prev => prev.map(b => b.id === id ? { ...b, id: created.id, name: created.name } : b));
-              }).catch(() => {});
+                api.discovery.create(activeProject.id, { name }).then(created => {
+                  setCategories(prev => prev.map(b => b.id === id ? { ...b, id: created.id, name: created.name } : b));
+                }).catch(() => {});
 
-              setTimeout(() => {
-                categoryRefs.current[id]?.scrollIntoView({ behavior: "smooth", block: "start" });
-              }, 50);
+                setTimeout(() => {
+                  categoryRefs.current[id]?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }, 50);
+              });
             }}
           >
             + New Category
@@ -410,16 +419,21 @@ export default function DiscoveryPage() {
                                             className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                const title = window.prompt(`New note in "${category.name}"`, "Quick note");
-                                                if (!title) return;
-                                                const content = window.prompt("Note text", "");
-
-                                                addCategoryItem(category.id, {
-                                                    id: `${Date.now()}`,
-                                                    type: 'note',
-                                                    title,
-                                                    preview: (content || "").slice(0, 80) || "(empty)",
-                                                    date: new Date().toLocaleDateString([], { month: 'short', day: 'numeric' })
+                                                prompt({
+                                                    title: `New Note in "${category.name}"`,
+                                                    fields: [
+                                                        { name: "title", label: "Title", defaultValue: "Quick note" },
+                                                        { name: "content", label: "Content", type: "textarea" },
+                                                    ],
+                                                }).then((result) => {
+                                                    if (!result) return;
+                                                    addCategoryItem(category.id, {
+                                                        id: `${Date.now()}`,
+                                                        type: 'note',
+                                                        title: result.title,
+                                                        preview: (result.content || "").slice(0, 80) || "(empty)",
+                                                        date: new Date().toLocaleDateString([], { month: 'short', day: 'numeric' })
+                                                    });
                                                 });
                                             }}
                                             aria-label="Make a note"
@@ -472,17 +486,24 @@ export default function DiscoveryPage() {
                                             className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                const url = window.prompt("Paste a link (URL)", "https://");
-                                                if (!url) return;
-                                                const title = window.prompt("Link name", url) || url;
-
-                                                addCategoryItem(category.id, {
-                                                    id: `${Date.now()}`,
-                                                    type: 'link',
-                                                    title,
-                                                    preview: url,
-                                                    date: new Date().toLocaleDateString([], { month: 'short', day: 'numeric' }),
-                                                    url
+                                                prompt({
+                                                    title: "Add Link",
+                                                    fields: [
+                                                        { name: "url", label: "URL", type: "url", placeholder: "https://" },
+                                                        { name: "title", label: "Link name" },
+                                                    ],
+                                                }).then((result) => {
+                                                    if (!result) return;
+                                                    const url = result.url;
+                                                    const title = result.title || url;
+                                                    addCategoryItem(category.id, {
+                                                        id: `${Date.now()}`,
+                                                        type: 'link',
+                                                        title,
+                                                        preview: url,
+                                                        date: new Date().toLocaleDateString([], { month: 'short', day: 'numeric' }),
+                                                        url
+                                                    });
                                                 });
                                             }}
                                             aria-label="Link a file"

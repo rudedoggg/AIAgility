@@ -22,6 +22,7 @@ import { getSelectedProject, subscribeToSelectedProject } from "@/lib/projectSto
 import { Message, Section } from "@/lib/types";
 import { ChevronRight, Target, Flag, Users, AlertTriangle, Circle, ChevronDown, StickyNote, Upload, Link2, RefreshCw, Trash2, FileText as FileTextIcon } from "lucide-react";
 import { cn, getProgressPercent } from "@/lib/utils";
+import { usePromptDialog } from "@/components/shared/PromptDialogProvider";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -114,6 +115,7 @@ function BriefSectionChat({ sectionId, sectionName }: { sectionId: string; secti
 
 export default function BriefPage() {
   const queryClient = useQueryClient();
+  const { prompt } = usePromptDialog();
   const [activeProject, setActiveProject] = useState(getSelectedProject());
 
   const { data: briefSections } = useQuery({
@@ -328,39 +330,46 @@ export default function BriefPage() {
     });
   };
 
-  const handleAddSection = () => {
-    const name = window.prompt("New brief section", "New section");
-    if (!name) return;
+  const handleAddSection = (): void => {
+    prompt({
+      title: "New Brief Section",
+      fields: [
+        { name: "name", label: "Section name", defaultValue: "New section" },
+      ],
+    }).then((result) => {
+      if (!result) return;
+      const name = result.name;
 
-    const tempId = `section-${Date.now()}`;
-    const newSection: LocalSection = {
-      id: tempId,
-      genericName: name,
-      subtitle: "(draft)",
-      completeness: 0,
-      totalItems: 0,
-      completedItems: 0,
-      content: "",
-      items: [],
-      isOpen: true,
-    };
+      const tempId = `section-${Date.now()}`;
+      const newSection: LocalSection = {
+        id: tempId,
+        genericName: name,
+        subtitle: "(draft)",
+        completeness: 0,
+        totalItems: 0,
+        completedItems: 0,
+        content: "",
+        items: [],
+        isOpen: true,
+      };
 
-    setSections((prev) => [newSection, ...prev]);
+      setSections((prev) => [newSection, ...prev]);
 
-    api.brief.create(activeProject.id, {
-      genericName: name,
-      subtitle: "(draft)",
-      completeness: 0,
-      totalItems: 0,
-      completedItems: 0,
-      content: "",
-    }).then((created) => {
-      setSections(prev => prev.map(s => s.id === tempId ? { ...s, id: created.id } : s));
-    }).catch(() => {});
+      api.brief.create(activeProject.id, {
+        genericName: name,
+        subtitle: "(draft)",
+        completeness: 0,
+        totalItems: 0,
+        completedItems: 0,
+        content: "",
+      }).then((created) => {
+        setSections(prev => prev.map(s => s.id === tempId ? { ...s, id: created.id } : s));
+      }).catch(() => {});
 
-    setTimeout(() => {
-      sectionRefs.current[tempId]?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 50);
+      setTimeout(() => {
+        sectionRefs.current[tempId]?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 50);
+    });
   };
 
   const summaryStatus = projectData?.dashboardStatus?.status || "Seeded from the project summary. Next: make the brief explicit.";
@@ -477,16 +486,21 @@ export default function BriefPage() {
                                             className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                const title = window.prompt(`New note in "${section.genericName}"`, "Quick note");
-                                                if (!title) return;
-                                                const content = window.prompt("Note text", "");
-
-                                                addSectionItem(section.id, {
-                                                    id: `${Date.now()}`,
-                                                    type: 'note',
-                                                    title,
-                                                    preview: (content || "").slice(0, 80) || "(empty)",
-                                                    date: new Date().toLocaleDateString([], { month: 'short', day: 'numeric' })
+                                                prompt({
+                                                    title: `New Note in "${section.genericName}"`,
+                                                    fields: [
+                                                        { name: "title", label: "Title", defaultValue: "Quick note" },
+                                                        { name: "content", label: "Content", type: "textarea" },
+                                                    ],
+                                                }).then((result) => {
+                                                    if (!result) return;
+                                                    addSectionItem(section.id, {
+                                                        id: `${Date.now()}`,
+                                                        type: 'note',
+                                                        title: result.title,
+                                                        preview: (result.content || "").slice(0, 80) || "(empty)",
+                                                        date: new Date().toLocaleDateString([], { month: 'short', day: 'numeric' })
+                                                    });
                                                 });
                                             }}
                                             aria-label="Make a note"
@@ -537,17 +551,24 @@ export default function BriefPage() {
                                             className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                const url = window.prompt("Paste a link (URL)", "https://");
-                                                if (!url) return;
-                                                const title = window.prompt("Link name", url) || url;
-
-                                                addSectionItem(section.id, {
-                                                    id: `${Date.now()}`,
-                                                    type: 'link',
-                                                    title,
-                                                    preview: url,
-                                                    date: new Date().toLocaleDateString([], { month: 'short', day: 'numeric' }),
-                                                    url
+                                                prompt({
+                                                    title: "Add Link",
+                                                    fields: [
+                                                        { name: "url", label: "URL", type: "url", placeholder: "https://" },
+                                                        { name: "title", label: "Link name" },
+                                                    ],
+                                                }).then((result) => {
+                                                    if (!result) return;
+                                                    const url = result.url;
+                                                    const title = result.title || url;
+                                                    addSectionItem(section.id, {
+                                                        id: `${Date.now()}`,
+                                                        type: 'link',
+                                                        title,
+                                                        preview: url,
+                                                        date: new Date().toLocaleDateString([], { month: 'short', day: 'numeric' }),
+                                                        url
+                                                    });
                                                 });
                                             }}
                                             aria-label="Link a file"
