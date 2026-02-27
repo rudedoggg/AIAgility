@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { getSelectedProject, setSelectedProject } from "@/lib/projectStore";
 import { api, type ApiProject } from "@/lib/api";
+import { Trash2 } from "lucide-react";
+import { Link } from "wouter";
 
 export default function ProjectsPage() {
   const queryClient = useQueryClient();
@@ -75,6 +77,11 @@ export default function ProjectsPage() {
                 Manage your projects.
               </div>
             </div>
+            <Link href="/settings/projects/trash">
+              <Button variant="outline" size="sm" className="gap-2" data-testid="button-view-trash">
+                <Trash2 className="w-4 h-4" /> View Trash
+              </Button>
+            </Link>
           </div>
 
           <Card className="p-4">

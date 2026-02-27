@@ -7,10 +7,12 @@ export interface IAuthStorage {
   upsertUser(user: UpsertUser): Promise<User>;
 }
 
-const ADMIN_EMAILS: ReadonlySet<string> = new Set([
-  "chad@theacompany.com",
-  "john.ruder@gmail.com",
-]);
+const ADMIN_EMAILS: ReadonlySet<string> = new Set(
+  (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean),
+);
 
 class AuthStorage implements IAuthStorage {
   async getUser(id: string): Promise<User | undefined> {

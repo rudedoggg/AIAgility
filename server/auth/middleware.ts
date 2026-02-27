@@ -33,6 +33,12 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
       issuer: `${SUPABASE_URL}/auth/v1`,
     });
     req.userId = payload.sub;
+
+    const user = await authStorage.getUser(payload.sub!);
+    if (user && user.isActive === false) {
+      return res.status(403).json({ message: "Account deactivated" });
+    }
+
     next();
   } catch {
     return res.status(401).json({ message: "Unauthorized" });

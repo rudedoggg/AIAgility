@@ -1,4 +1,4 @@
-import { eq, asc, and, isNull, lt } from "drizzle-orm";
+import { eq, asc, and, isNull, isNotNull, lt } from "drizzle-orm";
 import { db } from "./db";
 import {
   projects, briefSections, discoveryCategories, deliverables, bucketItems, chatMessages, coreQueries,
@@ -19,6 +19,7 @@ export interface IStorage {
   deleteProject(id: string): Promise<void>;
   restoreProject(id: string): Promise<Project | undefined>;
   permanentlyDeleteExpiredProjects(): Promise<number>;
+  listArchivedProjects(userId: string): Promise<Project[]>;
   listAllProjects(): Promise<Project[]>;
 
   listBriefSections(projectId: string): Promise<BriefSection[]>;
@@ -68,6 +69,10 @@ export class DatabaseStorage implements IStorage {
       return db.select().from(projects).where(and(eq(projects.userId, userId), isNull(projects.archivedAt))).orderBy(asc(projects.createdAt));
     }
     return db.select().from(projects).where(isNull(projects.archivedAt)).orderBy(asc(projects.createdAt));
+  }
+
+  async listArchivedProjects(userId: string): Promise<Project[]> {
+    return db.select().from(projects).where(and(eq(projects.userId, userId), isNotNull(projects.archivedAt))).orderBy(asc(projects.createdAt));
   }
 
   async listAllProjects(): Promise<Project[]> {

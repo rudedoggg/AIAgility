@@ -91,6 +91,22 @@ export async function registerRoutes(
     res.json(rows);
   });
 
+  app.get("/api/projects/archived", isAuthenticated, async (req, res) => {
+    const userId = getUserId(req);
+    const rows = await storage.listArchivedProjects(userId);
+    res.json(rows);
+  });
+
+  app.patch("/api/projects/:id/restore", isAuthenticated, async (req, res) => {
+    const userId = getUserId(req);
+    if (!await verifyProjectOwnership(param(req, "id"), userId)) return res.status(404).json({ message: "Not found" });
+    const project = await storage.getProject(param(req, "id"));
+    if (!project?.archivedAt) return res.status(400).json({ message: "Project is not archived" });
+    const restored = await storage.restoreProject(param(req, "id"));
+    if (!restored) return res.status(404).json({ message: "Not found" });
+    res.json(restored);
+  });
+
   app.get("/api/projects/:id", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
     const row = await storage.getProject(param(req, "id"));
@@ -432,7 +448,8 @@ export async function registerRoutes(
     if (targetId === currentUserId) return res.status(400).json({ message: "Cannot deactivate yourself" });
     const user = await authStorage.getUser(targetId);
     if (!user) return res.status(404).json({ message: "User not found" });
-    res.json({ message: "User deactivated", userId: targetId });
+    const [updated] = await db.update(users).set({ isActive: !user.isActive }).where(eq(users.id, targetId)).returning();
+    res.json(updated);
   });
 
   // === CORE QUERIES (admin write, all users read) ===

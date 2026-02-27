@@ -21,6 +21,7 @@ import LandingPage from "@/pages/LandingPage";
 import AdminPage from "@/pages/AdminPage";
 import CoreQsPage from "@/pages/CoreQsPage";
 import StyleGuidePage from "@/pages/StyleGuidePage";
+import TrashPage from "@/pages/TrashPage";
 import NotFound from "@/pages/not-found";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import { PromptDialogProvider } from "@/components/shared/PromptDialogProvider";
@@ -38,6 +39,7 @@ function AuthenticatedRouter() {
       <Route path="/settings/preferences" component={PreferencesPage} />
       <Route path="/settings/notifications" component={NotificationsPage} />
       <Route path="/settings/billing" component={BillingPage} />
+      <Route path="/settings/projects/trash" component={TrashPage} />
       <Route path="/settings/projects" component={ProjectsPage} />
       <Route path="/support" component={HelpSupportPage} />
 
