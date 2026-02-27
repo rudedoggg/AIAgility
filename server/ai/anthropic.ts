@@ -12,6 +12,10 @@ export class AnthropicProvider implements AIProvider {
     this.client = new Anthropic({ apiKey });
   }
 
+  getProviderName(): string {
+    return "anthropic";
+  }
+
   async *streamCompletion(messages: AIMessage[]): AsyncIterable<string> {
     const systemMessage = messages.find((m) => m.role === "system");
     const conversationMessages = messages

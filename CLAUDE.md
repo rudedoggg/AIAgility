@@ -64,10 +64,17 @@ npm run build    # Full production build
 
 No linter or test framework configured yet.
 
+## Environment Variables
+
+- **`DATABASE_URL`** is a Railway environment variable, NOT in `.env`. To run `drizzle-kit push` or any command needing DB access locally, use: `railway run npx drizzle-kit push`
+- **Do NOT ask the user for the DATABASE_URL** — it lives in Railway. Use `railway run` to execute DB commands.
+- Frontend env vars (`VITE_*`) are in `.env` for local dev and Vercel for production.
+- Backend env vars (`ANTHROPIC_API_KEY`, `SUPABASE_*`, etc.) are in Railway.
+
 ## Known Gotchas
 
 1. **Auth is in `server/auth/`** — Use `isAuthenticated` and `isAdmin` from there. JWT verified via Supabase JWT secret.
-2. **Drizzle ORM, NOT Prisma** — Schema in `shared/schema.ts`, migrations via `drizzle-kit push`
+2. **Drizzle ORM, NOT Prisma** — Schema in `shared/schema.ts`, migrations via `railway run npx drizzle-kit push`
 3. **No Redux/Zustand** — React Query for server state + localStorage (`projectStore.ts`) for selected project
 4. **All resources are user-scoped** — Every route must verify `userId` ownership via `verifyProjectOwnership()`
 5. **Polymorphic parentType** — `bucket_items` and `chat_messages` use `parentType` for different parent tables
