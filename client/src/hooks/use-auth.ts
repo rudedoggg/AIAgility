@@ -14,7 +14,7 @@ async function fetchAppUser(): Promise<User | null> {
     headers: { Authorization: `Bearer ${token}` },
   });
 
-  if (res.status === 401 || res.status === 404) return null;
+  if (res.status === 401 || res.status === 403 || res.status === 404) return null;
   if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
   return res.json();
 }
@@ -41,8 +41,8 @@ async function syncUser(): Promise<void> {
         profileImageUrl: meta.avatar_url || meta.picture || null,
       }),
     });
-  } catch (err) {
-    console.warn("Failed to sync user profile:", err);
+  } catch {
+    // Sync failure is non-critical; user is still authenticated
   }
 }
 

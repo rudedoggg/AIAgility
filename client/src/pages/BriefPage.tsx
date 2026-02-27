@@ -240,7 +240,7 @@ export default function BriefPage() {
   const addSectionItem = (sectionId: string, item: NonNullable<Section["items"]>[number]) => {
       setSectionItems(prev => ({
         ...prev,
-        [sectionId]: [{ ...item, parentId: sectionId, parentType: "brief", url: (item as any).url || null, fileName: (item as any).fileName || null, fileSizeLabel: (item as any).fileSizeLabel || null, sortOrder: 0 } as ApiBucketItem, ...(prev[sectionId] || [])],
+        [sectionId]: [{ ...item, parentId: sectionId, parentType: "brief", url: item.url ?? null, fileName: item.fileName ?? null, fileSizeLabel: item.fileSizeLabel ?? null, sortOrder: 0 } as ApiBucketItem, ...(prev[sectionId] || [])],
       }));
 
       api.items.create({
@@ -250,9 +250,9 @@ export default function BriefPage() {
         title: item.title,
         preview: item.preview,
         date: item.date,
-        url: (item as any).url || null,
-        fileName: (item as any).fileName || null,
-        fileSizeLabel: (item as any).fileSizeLabel || null,
+        url: item.url ?? null,
+        fileName: item.fileName ?? null,
+        fileSizeLabel: item.fileSizeLabel ?? null,
       }).catch(() => {});
   };
 

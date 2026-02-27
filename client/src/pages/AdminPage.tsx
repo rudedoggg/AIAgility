@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, FolderOpen, ShieldCheck, ShieldOff, ArrowLeft } from "lucide-react";
+import { Users, FolderOpen, ShieldCheck, ShieldOff, ArrowLeft, UserX, UserCheck } from "lucide-react";
 import { Link } from "wouter";
 import type { User } from "@shared/models/auth";
 import type { Project } from "@shared/schema";
@@ -32,6 +32,16 @@ export default function AdminPage() {
   const toggleAdminMutation = useMutation({
     mutationFn: async (userId: string) => {
       const res = await apiRequest("PATCH", `/api/admin/users/${userId}/toggle-admin`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+    },
+  });
+
+  const deactivateMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const res = await apiRequest("PATCH", `/api/admin/users/${userId}/deactivate`);
       return res.json();
     },
     onSuccess: () => {
@@ -109,23 +119,43 @@ export default function AdminPage() {
                     <Badge variant={u.isAdmin ? "default" : "outline"} data-testid={`badge-role-${u.id}`}>
                       {u.isAdmin ? "Admin" : "User"}
                     </Badge>
+                    {u.isActive === false && (
+                      <Badge variant="destructive" data-testid={`badge-deactivated-${u.id}`}>
+                        Deactivated
+                      </Badge>
+                    )}
                     <span className="text-xs text-muted-foreground" data-testid={`text-user-joined-${u.id}`}>
                       Joined {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "N/A"}
                     </span>
                     {u.id !== user?.id && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => toggleAdminMutation.mutate(u.id)}
-                        disabled={toggleAdminMutation.isPending}
-                        data-testid={`button-toggle-admin-${u.id}`}
-                      >
-                        {u.isAdmin ? (
-                          <><ShieldOff className="w-4 h-4 mr-1" /> Remove Admin</>
-                        ) : (
-                          <><ShieldCheck className="w-4 h-4 mr-1" /> Make Admin</>
-                        )}
-                      </Button>
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleAdminMutation.mutate(u.id)}
+                          disabled={toggleAdminMutation.isPending}
+                          data-testid={`button-toggle-admin-${u.id}`}
+                        >
+                          {u.isAdmin ? (
+                            <><ShieldOff className="w-4 h-4 mr-1" /> Remove Admin</>
+                          ) : (
+                            <><ShieldCheck className="w-4 h-4 mr-1" /> Make Admin</>
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deactivateMutation.mutate(u.id)}
+                          disabled={deactivateMutation.isPending}
+                          data-testid={`button-deactivate-${u.id}`}
+                        >
+                          {u.isActive === false ? (
+                            <><UserCheck className="w-4 h-4 mr-1" /> Reactivate</>
+                          ) : (
+                            <><UserX className="w-4 h-4 mr-1" /> Deactivate</>
+                          )}
+                        </Button>
+                      </>
                     )}
                   </div>
                 </div>

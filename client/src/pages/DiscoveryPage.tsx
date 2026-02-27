@@ -19,7 +19,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { AppShell } from "@/components/layout/AppShell";
 import { ChatWorkspace } from "@/components/shared/ChatWorkspace";
 import { getSelectedProject, subscribeToSelectedProject } from "@/lib/projectStore";
-import { Message, Category } from "@/lib/types";
+import { Message, Category, BucketItem } from "@/lib/types";
 import { FileText, Link as LinkIcon, MessageSquare, StickyNote, FolderOpen, Folder, Plus, ChevronRight, Upload, Link2, RefreshCw, Trash2 } from "lucide-react";
 import { cn, getProgressPercent } from "@/lib/utils";
 import { usePromptDialog } from "@/components/shared/PromptDialogProvider";
@@ -168,7 +168,7 @@ export default function DiscoveryPage() {
             ...b,
             items: items.map(i => ({
               id: i.id,
-              type: i.type as any,
+              type: i.type as BucketItem['type'],
               title: i.title,
               preview: i.preview,
               date: i.date,
@@ -203,9 +203,9 @@ export default function DiscoveryPage() {
         title: item.title,
         preview: item.preview,
         date: item.date,
-        url: (item as any).url || null,
-        fileName: (item as any).fileName || null,
-        fileSizeLabel: (item as any).fileSizeLabel || null,
+        url: item.url ?? null,
+        fileName: item.fileName ?? null,
+        fileSizeLabel: item.fileSizeLabel ?? null,
       }).then(created => {
         setCategories(prev => prev.map(b => {
           if (b.id !== categoryId) return b;

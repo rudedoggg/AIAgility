@@ -93,6 +93,8 @@ export const api = {
     create: (data: Partial<ApiProject>) => apiRequest("POST", "/api/projects", data).then(json<ApiProject>),
     update: (id: string, data: Partial<ApiProject>) => apiRequest("PATCH", `/api/projects/${id}`, data).then(json<ApiProject>),
     delete: (id: string) => apiRequest("DELETE", `/api/projects/${id}`),
+    listArchived: () => fetchJson<ApiProject[]>("/api/projects/archived"),
+    restore: (id: string) => apiRequest("PATCH", `/api/projects/${id}/restore`).then(json<ApiProject>),
   },
 
   brief: {

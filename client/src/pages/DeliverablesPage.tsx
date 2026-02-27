@@ -206,9 +206,9 @@ export default function DeliverablesPage() {
           title: item.title,
           preview: item.preview,
           date: item.date,
-          url: (item as any).url || null,
-          fileName: (item as any).fileName || null,
-          fileSizeLabel: (item as any).fileSizeLabel || null,
+          url: item.url ?? null,
+          fileName: item.fileName ?? null,
+          fileSizeLabel: item.fileSizeLabel ?? null,
           sortOrder: 0,
         },
         ...(prev[deliverableId] || []),
@@ -222,9 +222,9 @@ export default function DeliverablesPage() {
       title: item.title,
       preview: item.preview,
       date: item.date,
-      url: (item as any).url || null,
-      fileName: (item as any).fileName || null,
-      fileSizeLabel: (item as any).fileSizeLabel || null,
+      url: item.url ?? null,
+      fileName: item.fileName ?? null,
+      fileSizeLabel: item.fileSizeLabel ?? null,
     }).catch(() => {});
   };
 
@@ -424,7 +424,7 @@ export default function DeliverablesPage() {
                         title: `v${Date.now()} • ${time}${firstLine ? ` • ${firstLine.slice(0, 48)}` : ""}`,
                         preview: msg.content,
                         date: label,
-                    } as any);
+                    });
                 }}
                 className="flex-1 min-h-0"
             />
@@ -458,7 +458,7 @@ export default function DeliverablesPage() {
                                             style={{
                                                 width: `${getProgressPercent({
                                                     explicitPercent: doc.completeness,
-                                                    itemsCount: ((doc.items || []) as any[]).length,
+                                                    itemsCount: (doc.items ?? []).length,
                                                 })}%`,
                                             }}
                                         />
@@ -602,13 +602,13 @@ export default function DeliverablesPage() {
                                                 <div className="h-full flex flex-col">
                                                     <div className="px-4 py-3 border-b border-border/50 text-[11px] uppercase tracking-wider text-muted-foreground" data-testid={`text-deliverable-title-${doc.id}`}>Deliverable</div>
                                                     <div className="flex-1 overflow-y-auto">
-                                                        {((doc.items || []) as any[]).length === 0 ? (
+                                                        {(doc.items ?? []).length === 0 ? (
                                                             <div className="px-4 py-3 text-sm text-muted-foreground" data-testid={`text-deliverable-empty-${doc.id}`}>No versions yet. Use chat to draft and save the first version.</div>
                                                         ) : (
                                                             <div className="divide-y">
-                                                                {((doc.items || []) as any[])
-                                                                    .filter((i: any) => i.type === 'doc' || i.type === 'link')
-                                                                    .map((item: any, idx: number) => (
+                                                                {(doc.items ?? [])
+                                                                    .filter((i) => i.type === 'doc' || i.type === 'link')
+                                                                    .map((item, idx) => (
                                                                     <div key={item.id} className="group flex items-start gap-3 px-4 py-3">
                                                                         <div className="mt-0.5 text-muted-foreground group-hover:text-primary transition-colors">
                                                                             {item.type === 'doc' && <FileTextIcon className="w-4 h-4" />}
@@ -618,7 +618,7 @@ export default function DeliverablesPage() {
                                                                             <div className="flex items-center justify-between gap-3">
                                                                                 <div className="min-w-0">
                                                                                     <div className="text-sm font-medium text-foreground truncate" data-testid={`text-deliverable-version-name-${item.id}`}>{item.title}</div>
-                                                                                    <div className="text-[10px] text-muted-foreground" data-testid={`text-deliverable-version-meta-${item.id}`}>Version {((doc.items || []) as any[]).filter((v: any) => v.type === 'doc' || v.type === 'link').length - idx} • {item.date}</div>
+                                                                                    <div className="text-[10px] text-muted-foreground" data-testid={`text-deliverable-version-meta-${item.id}`}>Version {(doc.items ?? []).filter((v) => v.type === 'doc' || v.type === 'link').length - idx} • {item.date}</div>
                                                                                 </div>
                                                                                 <div className="flex items-center gap-2 shrink-0">
                                                                                     <button
