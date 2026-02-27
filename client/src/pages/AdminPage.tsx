@@ -62,8 +62,15 @@ export default function AdminPage() {
             <div className="h-6 w-px bg-border" />
             <h1 className="font-bold text-lg" data-testid="text-admin-title">Admin Dashboard</h1>
           </div>
-          <div className="text-sm text-muted-foreground" data-testid="text-admin-user">
-            Signed in as {user?.firstName || user?.email || "Admin"}
+          <div className="flex items-center gap-3">
+            <Link href="/admin/auth-users">
+              <Button variant="outline" size="sm" className="gap-2" data-testid="button-auth-users">
+                <Users className="w-4 h-4" /> Auth Users
+              </Button>
+            </Link>
+            <div className="text-sm text-muted-foreground" data-testid="text-admin-user">
+              Signed in as {user?.firstName || user?.email || "Admin"}
+            </div>
           </div>
         </div>
       </div>

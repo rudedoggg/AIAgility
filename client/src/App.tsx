@@ -22,6 +22,7 @@ import AdminPage from "@/pages/AdminPage";
 import CoreQsPage from "@/pages/CoreQsPage";
 import StyleGuidePage from "@/pages/StyleGuidePage";
 import TrashPage from "@/pages/TrashPage";
+import AuthUsersPage from "@/pages/AuthUsersPage";
 import NotFound from "@/pages/not-found";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import { PromptDialogProvider } from "@/components/shared/PromptDialogProvider";
@@ -48,6 +49,7 @@ function AuthenticatedRouter() {
       <Route path="/account/security" component={SecurityPage} />
 
       <Route path="/admin" component={AdminPage} />
+      <Route path="/admin/auth-users" component={AuthUsersPage} />
       <Route path="/admin/coreqs" component={CoreQsPage} />
       <Route path="/admin/style-guide" component={StyleGuidePage} />
 

@@ -7,13 +7,6 @@ export interface IAuthStorage {
   upsertUser(user: UpsertUser): Promise<User>;
 }
 
-const ADMIN_EMAILS: ReadonlySet<string> = new Set(
-  (process.env.ADMIN_EMAILS ?? "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean),
-);
-
 class AuthStorage implements IAuthStorage {
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
@@ -23,19 +16,17 @@ class AuthStorage implements IAuthStorage {
   async upsertUser(userData: UpsertUser): Promise<User> {
     const [countResult] = await db.select({ count: sql<number>`count(*)` }).from(users);
     const isFirstUser = Number(countResult.count) === 0;
-    const isAllowlistedAdmin = !!(userData.email && ADMIN_EMAILS.has(userData.email.toLowerCase()));
 
     const [user] = await db
       .insert(users)
       .values({
         ...userData,
-        isAdmin: (isFirstUser || isAllowlistedAdmin) ? true : undefined,
+        isAdmin: isFirstUser ? true : undefined,
       })
       .onConflictDoUpdate({
         target: users.id,
         set: {
           ...userData,
-          isAdmin: isAllowlistedAdmin ? true : undefined,
           updatedAt: new Date(),
         },
       })
