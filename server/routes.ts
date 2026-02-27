@@ -360,6 +360,9 @@ export async function registerRoutes(
       conversationHistory,
       providerName: provider.getProviderName(),
       fallbackPrompt,
+      parentId,
+      parentType,
+      projectId,
     });
 
     // Set up SSE
