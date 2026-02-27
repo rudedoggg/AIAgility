@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, jsonb, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -105,6 +105,58 @@ export type BucketItem = typeof bucketItems.$inferSelect;
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 export type ChatMessage = typeof chatMessages.$inferSelect;
 
+export const promptBlocks = pgTable("prompt_blocks", {
+  id: varchar("id", { length: 64 }).primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  category: text("category").notNull(),
+  content: text("content").notNull().default(""),
+  description: text("description").notNull().default(""),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const promptVersions = pgTable("prompt_versions", {
+  id: varchar("id", { length: 64 }).primaryKey().default(sql`gen_random_uuid()`),
+  blockId: varchar("block_id", { length: 64 }).notNull().references(() => promptBlocks.id, { onDelete: "cascade" }),
+  content: text("content").notNull(),
+  version: integer("version").notNull(),
+  changedBy: varchar("changed_by", { length: 255 }).notNull(),
+  changeNote: text("change_note").notNull().default(""),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("prompt_versions_block_version_idx").on(table.blockId, table.version),
+]);
+
+export const promptLocations = pgTable("prompt_locations", {
+  id: varchar("id", { length: 64 }).primaryKey().default(sql`gen_random_uuid()`),
+  locationKey: text("location_key").notNull(),
+  blockId: varchar("block_id", { length: 64 }).notNull().references(() => promptBlocks.id, { onDelete: "cascade" }),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+}, (table) => [
+  uniqueIndex("prompt_locations_location_block_idx").on(table.locationKey, table.blockId),
+  index("prompt_locations_location_key_idx").on(table.locationKey),
+]);
+
 export const insertCoreQuerySchema = createInsertSchema(coreQueries).omit({ id: true, updatedAt: true });
 export type InsertCoreQuery = z.infer<typeof insertCoreQuerySchema>;
 export type CoreQuery = typeof coreQueries.$inferSelect;
+
+export const insertPromptBlockSchema = createInsertSchema(promptBlocks).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPromptVersionSchema = createInsertSchema(promptVersions).omit({ id: true, createdAt: true });
+export const insertPromptLocationSchema = createInsertSchema(promptLocations).omit({ id: true });
+
+export type InsertPromptBlock = z.infer<typeof insertPromptBlockSchema>;
+export type PromptBlock = typeof promptBlocks.$inferSelect;
+export type InsertPromptVersion = z.infer<typeof insertPromptVersionSchema>;
+export type PromptVersion = typeof promptVersions.$inferSelect;
+export type InsertPromptLocation = z.infer<typeof insertPromptLocationSchema>;
+export type PromptLocation = typeof promptLocations.$inferSelect;
+
+export type PromptBlockForLocation = {
+  category: string;
+  content: string;
+  locationSortOrder: number;
+};

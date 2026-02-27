@@ -2,6 +2,7 @@ import { eq, asc, and, isNull, isNotNull, lt } from "drizzle-orm";
 import { db } from "./db";
 import {
   projects, briefSections, discoveryCategories, deliverables, bucketItems, chatMessages, coreQueries,
+  promptBlocks, promptVersions, promptLocations,
   type InsertProject, type Project,
   type InsertBriefSection, type BriefSection,
   type InsertDiscoveryCategory, type DiscoveryCategory,
@@ -9,6 +10,10 @@ import {
   type InsertBucketItem, type BucketItem,
   type InsertChatMessage, type ChatMessage,
   type CoreQuery,
+  type InsertPromptBlock, type PromptBlock,
+  type InsertPromptVersion, type PromptVersion,
+  type InsertPromptLocation, type PromptLocation,
+  type PromptBlockForLocation,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -61,6 +66,25 @@ export interface IStorage {
   listCoreQueries(): Promise<CoreQuery[]>;
   getCoreQuery(locationKey: string): Promise<CoreQuery | undefined>;
   upsertCoreQuery(locationKey: string, contextQuery: string): Promise<CoreQuery>;
+
+  // Prompt blocks
+  listPromptBlocks(): Promise<PromptBlock[]>;
+  getPromptBlock(id: string): Promise<PromptBlock | undefined>;
+  createPromptBlock(data: InsertPromptBlock): Promise<PromptBlock>;
+  updatePromptBlock(id: string, data: Partial<InsertPromptBlock>): Promise<PromptBlock | undefined>;
+  deletePromptBlock(id: string): Promise<void>;
+
+  // Prompt versions
+  listPromptVersions(blockId: string): Promise<PromptVersion[]>;
+  createPromptVersion(data: InsertPromptVersion): Promise<PromptVersion>;
+
+  // Prompt locations
+  getBlocksForLocation(locationKey: string): Promise<PromptBlockForLocation[]>;
+  listPromptLocations(locationKey: string): Promise<PromptLocation[]>;
+  createPromptLocation(data: InsertPromptLocation): Promise<PromptLocation>;
+  updatePromptLocation(id: string, data: Partial<InsertPromptLocation>): Promise<PromptLocation | undefined>;
+  deletePromptLocation(id: string): Promise<void>;
+  reorderPromptLocations(locationKey: string, ids: string[]): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -299,6 +323,100 @@ export class DatabaseStorage implements IStorage {
       .values({ locationKey, contextQuery })
       .returning();
     return row;
+  }
+
+  // === Prompt Blocks ===
+
+  async listPromptBlocks(): Promise<PromptBlock[]> {
+    return db.select().from(promptBlocks).orderBy(asc(promptBlocks.category), asc(promptBlocks.sortOrder));
+  }
+
+  async getPromptBlock(id: string): Promise<PromptBlock | undefined> {
+    const [row] = await db.select().from(promptBlocks).where(eq(promptBlocks.id, id));
+    return row;
+  }
+
+  async createPromptBlock(data: InsertPromptBlock): Promise<PromptBlock> {
+    const [row] = await db.insert(promptBlocks).values(data).returning();
+    return row;
+  }
+
+  async updatePromptBlock(id: string, data: Partial<InsertPromptBlock>): Promise<PromptBlock | undefined> {
+    const [row] = await db.update(promptBlocks)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(promptBlocks.id, id))
+      .returning();
+    return row;
+  }
+
+  async deletePromptBlock(id: string): Promise<void> {
+    await db.delete(promptBlocks).where(eq(promptBlocks.id, id));
+  }
+
+  // === Prompt Versions ===
+
+  async listPromptVersions(blockId: string): Promise<PromptVersion[]> {
+    return db.select().from(promptVersions)
+      .where(eq(promptVersions.blockId, blockId))
+      .orderBy(asc(promptVersions.version));
+  }
+
+  async createPromptVersion(data: InsertPromptVersion): Promise<PromptVersion> {
+    const [row] = await db.insert(promptVersions).values(data).returning();
+    return row;
+  }
+
+  // === Prompt Locations ===
+
+  async getBlocksForLocation(locationKey: string): Promise<PromptBlockForLocation[]> {
+    const rows = await db
+      .select({
+        category: promptBlocks.category,
+        content: promptBlocks.content,
+        locationSortOrder: promptLocations.sortOrder,
+      })
+      .from(promptLocations)
+      .innerJoin(promptBlocks, eq(promptLocations.blockId, promptBlocks.id))
+      .where(
+        and(
+          eq(promptLocations.locationKey, locationKey),
+          eq(promptLocations.isActive, true),
+          eq(promptBlocks.isActive, true),
+        ),
+      )
+      .orderBy(asc(promptLocations.sortOrder));
+    return rows;
+  }
+
+  async listPromptLocations(locationKey: string): Promise<PromptLocation[]> {
+    return db.select().from(promptLocations)
+      .where(eq(promptLocations.locationKey, locationKey))
+      .orderBy(asc(promptLocations.sortOrder));
+  }
+
+  async createPromptLocation(data: InsertPromptLocation): Promise<PromptLocation> {
+    const [row] = await db.insert(promptLocations).values(data).returning();
+    return row;
+  }
+
+  async updatePromptLocation(id: string, data: Partial<InsertPromptLocation>): Promise<PromptLocation | undefined> {
+    const [row] = await db.update(promptLocations)
+      .set(data)
+      .where(eq(promptLocations.id, id))
+      .returning();
+    return row;
+  }
+
+  async deletePromptLocation(id: string): Promise<void> {
+    await db.delete(promptLocations).where(eq(promptLocations.id, id));
+  }
+
+  async reorderPromptLocations(locationKey: string, ids: string[]): Promise<void> {
+    for (let i = 0; i < ids.length; i++) {
+      await db.update(promptLocations)
+        .set({ sortOrder: i })
+        .where(and(eq(promptLocations.id, ids[i]), eq(promptLocations.locationKey, locationKey)));
+    }
   }
 }
 

@@ -8,6 +8,7 @@ import { db } from "./db";
 import { users, projects } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 import { getAIProvider, type AIMessage } from "./ai";
+import { assemblePrompt, PROMPT_CATEGORIES } from "./prompts";
 import { createClient } from "@supabase/supabase-js";
 
 const syncUserSchema = z.object({
@@ -341,25 +342,25 @@ export async function registerRoutes(
       saved: false,
     });
 
-    // Fetch conversation history (last 50 messages)
+    // Fetch conversation history
     const history = await storage.listChatMessages(parentId, parentType);
-    const recentHistory = history.slice(-50);
+    const conversationHistory: AIMessage[] = history.map((msg) => ({
+      role: msg.role === "user" ? "user" as const : "assistant" as const,
+      content: msg.content,
+    }));
 
-    // Fetch system prompt from core_queries
+    // Fetch legacy fallback prompt from core_queries
     const coreQuery = await storage.getCoreQuery(parentType);
-    const systemPrompt = coreQuery?.contextQuery || "";
+    const fallbackPrompt = coreQuery?.contextQuery || "";
 
-    // Build AI messages array
-    const aiMessages: AIMessage[] = [];
-    if (systemPrompt) {
-      aiMessages.push({ role: "system", content: systemPrompt });
-    }
-    for (const msg of recentHistory) {
-      aiMessages.push({
-        role: msg.role === "user" ? "user" : "assistant",
-        content: msg.content,
-      });
-    }
+    // Assemble prompt: loads blocks, applies model formatting, windows history
+    const provider = getAIProvider();
+    const aiMessages = await assemblePrompt({
+      locationKey: parentType,
+      conversationHistory,
+      providerName: provider.getProviderName(),
+      fallbackPrompt,
+    });
 
     // Set up SSE
     res.writeHead(200, {
@@ -371,7 +372,6 @@ export async function registerRoutes(
     let fullResponse = "";
 
     try {
-      const provider = getAIProvider();
       for await (const token of provider.streamCompletion(aiMessages)) {
         fullResponse += token;
         res.write(`data: ${JSON.stringify({ type: "token", text: token })}\n\n`);
@@ -487,6 +487,156 @@ export async function registerRoutes(
     if (typeof contextQuery !== "string") return res.status(400).json({ message: "contextQuery is required" });
     const row = await storage.upsertCoreQuery(locationKey, contextQuery);
     res.json(row);
+  });
+
+  // === PROMPT BLOCKS (admin only) ===
+  app.get("/api/admin/prompt-blocks", isAuthenticated, isAdmin, async (_req, res) => {
+    const rows = await storage.listPromptBlocks();
+    res.json(rows);
+  });
+
+  app.get("/api/admin/prompt-blocks/:id", isAuthenticated, isAdmin, async (req, res) => {
+    const row = await storage.getPromptBlock(param(req, "id"));
+    if (!row) return res.status(404).json({ message: "Not found" });
+    res.json(row);
+  });
+
+  const validCategories = new Set<string>(PROMPT_CATEGORIES);
+
+  app.post("/api/admin/prompt-blocks", isAuthenticated, isAdmin, async (req, res) => {
+    const { name, category, content, description, isActive, sortOrder } = req.body;
+    if (typeof name !== "string" || !name.trim()) return res.status(400).json({ message: "name is required" });
+    if (typeof category !== "string" || !validCategories.has(category)) {
+      return res.status(400).json({ message: `category must be one of: ${PROMPT_CATEGORIES.join(", ")}` });
+    }
+    const row = await storage.createPromptBlock({
+      name: name.trim(),
+      category,
+      content: content || "",
+      description: description || "",
+      isActive: isActive ?? true,
+      sortOrder: sortOrder ?? 0,
+    });
+    res.status(201).json(row);
+  });
+
+  app.patch("/api/admin/prompt-blocks/:id", isAuthenticated, isAdmin, async (req, res) => {
+    const existing = await storage.getPromptBlock(param(req, "id"));
+    if (!existing) return res.status(404).json({ message: "Not found" });
+
+    // Destructure only allowed fields
+    const { name, category, content, description, isActive, sortOrder, changeNote } = req.body;
+
+    if (category !== undefined && !validCategories.has(category)) {
+      return res.status(400).json({ message: `category must be one of: ${PROMPT_CATEGORIES.join(", ")}` });
+    }
+
+    const userId = getUserId(req);
+
+    // Auto-version: snapshot content before updating if content changed
+    if (content !== undefined && content !== existing.content) {
+      const versions = await storage.listPromptVersions(existing.id);
+      const nextVersion = versions.length + 1;
+      await storage.createPromptVersion({
+        blockId: existing.id,
+        content: existing.content,
+        version: nextVersion,
+        changedBy: userId,
+        changeNote: changeNote || "",
+      });
+    }
+
+    // Build update payload from allowed fields only
+    const update: Record<string, unknown> = {};
+    if (name !== undefined) update.name = name;
+    if (category !== undefined) update.category = category;
+    if (content !== undefined) update.content = content;
+    if (description !== undefined) update.description = description;
+    if (isActive !== undefined) update.isActive = isActive;
+    if (sortOrder !== undefined) update.sortOrder = sortOrder;
+
+    const row = await storage.updatePromptBlock(param(req, "id"), update);
+    if (!row) return res.status(404).json({ message: "Not found" });
+    res.json(row);
+  });
+
+  app.delete("/api/admin/prompt-blocks/:id", isAuthenticated, isAdmin, async (req, res) => {
+    const existing = await storage.getPromptBlock(param(req, "id"));
+    if (!existing) return res.status(404).json({ message: "Not found" });
+    await storage.deletePromptBlock(param(req, "id"));
+    res.status(204).end();
+  });
+
+  // === PROMPT VERSIONS (admin only, read) ===
+  app.get("/api/admin/prompt-blocks/:blockId/versions", isAuthenticated, isAdmin, async (req, res) => {
+    const rows = await storage.listPromptVersions(param(req, "blockId"));
+    res.json(rows);
+  });
+
+  // === PROMPT LOCATIONS (admin only) ===
+  app.get("/api/admin/prompt-locations/:locationKey", isAuthenticated, isAdmin, async (req, res) => {
+    const rows = await storage.listPromptLocations(param(req, "locationKey"));
+    res.json(rows);
+  });
+
+  app.post("/api/admin/prompt-locations", isAuthenticated, isAdmin, async (req, res) => {
+    const { locationKey, blockId, sortOrder, isActive } = req.body;
+    if (typeof locationKey !== "string" || !locationKey.trim()) return res.status(400).json({ message: "locationKey is required" });
+    if (typeof blockId !== "string" || !blockId.trim()) return res.status(400).json({ message: "blockId is required" });
+    const row = await storage.createPromptLocation({
+      locationKey,
+      blockId,
+      sortOrder: sortOrder ?? 0,
+      isActive: isActive ?? true,
+    });
+    res.status(201).json(row);
+  });
+
+  app.patch("/api/admin/prompt-locations/:id", isAuthenticated, isAdmin, async (req, res) => {
+    const { sortOrder, isActive } = req.body;
+    const update: Record<string, unknown> = {};
+    if (sortOrder !== undefined) update.sortOrder = sortOrder;
+    if (isActive !== undefined) update.isActive = isActive;
+
+    const row = await storage.updatePromptLocation(param(req, "id"), update);
+    if (!row) return res.status(404).json({ message: "Not found" });
+    res.json(row);
+  });
+
+  app.delete("/api/admin/prompt-locations/:id", isAuthenticated, isAdmin, async (req, res) => {
+    await storage.deletePromptLocation(param(req, "id"));
+    res.status(204).end();
+  });
+
+  app.put("/api/admin/prompt-locations/:locationKey/reorder", isAuthenticated, isAdmin, async (req, res) => {
+    const locationKey = param(req, "locationKey");
+    const { ids } = req.body;
+    if (!Array.isArray(ids)) return res.status(400).json({ message: "ids array is required" });
+    await storage.reorderPromptLocations(locationKey, ids);
+    res.status(204).end();
+  });
+
+  // === PROMPT PREVIEW (admin only) ===
+  app.get("/api/admin/prompt-preview/:locationKey", isAuthenticated, isAdmin, async (req, res) => {
+    const locationKey = param(req, "locationKey");
+    const providerName = (req.query.provider as string) || "anthropic";
+
+    const coreQuery = await storage.getCoreQuery(locationKey);
+    const fallbackPrompt = coreQuery?.contextQuery || "";
+
+    const aiMessages = await assemblePrompt({
+      locationKey,
+      conversationHistory: [],
+      providerName,
+      fallbackPrompt,
+    });
+
+    const systemMessage = aiMessages.find((m) => m.role === "system");
+    res.json({
+      systemMessage: systemMessage?.content || "",
+      provider: providerName,
+      tokenEstimate: Math.ceil((systemMessage?.content || "").length / 4),
+    });
   });
 
   return httpServer;

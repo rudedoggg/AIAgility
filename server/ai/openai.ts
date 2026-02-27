@@ -12,6 +12,10 @@ export class OpenAIProvider implements AIProvider {
     this.client = new OpenAI({ apiKey });
   }
 
+  getProviderName(): string {
+    return "openai";
+  }
+
   async *streamCompletion(messages: AIMessage[]): AsyncIterable<string> {
     const stream = await this.client.chat.completions.create({
       model: "gpt-5.2",

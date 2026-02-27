@@ -4,6 +4,7 @@ export type AIMessage = {
 };
 
 export interface AIProvider {
+  getProviderName(): string;
   streamCompletion(messages: AIMessage[]): AsyncIterable<string>;
 }
 
