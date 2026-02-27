@@ -8,6 +8,7 @@ import { db } from "./db";
 import { users, projects } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 import { getAIProvider, type AIMessage } from "./ai";
+import { createClient } from "@supabase/supabase-js";
 
 const syncUserSchema = z.object({
   email: z.string().email().nullable(),
@@ -450,6 +451,23 @@ export async function registerRoutes(
     if (!user) return res.status(404).json({ message: "User not found" });
     const [updated] = await db.update(users).set({ isActive: !user.isActive }).where(eq(users.id, targetId)).returning();
     res.json(updated);
+  });
+
+  // === SUPABASE AUTH USERS (admin only) ===
+  app.get("/api/admin/auth-users", isAuthenticated, isAdmin, async (_req, res) => {
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceRoleKey) {
+      return res.status(500).json({ message: "Supabase service role key not configured" });
+    }
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data, error } = await supabase.auth.admin.listUsers({ perPage: 1000 });
+    if (error) {
+      return res.status(500).json({ message: error.message });
+    }
+    res.json(data.users);
   });
 
   // === CORE QUERIES (admin write, all users read) ===
