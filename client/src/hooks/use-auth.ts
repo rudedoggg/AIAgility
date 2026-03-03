@@ -61,11 +61,15 @@ export function useAuth() {
       }
     }, 5000);
 
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(async ({ data }) => {
       if (!settled) {
         settled = true;
         setSession(data.session);
         setIsSessionLoading(false);
+      }
+      if (data.session) {
+        await syncUser();
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       }
     }).catch(() => {
       if (!settled) {
