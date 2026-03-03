@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, FolderOpen, ShieldCheck, ShieldOff, ArrowLeft, UserX, UserCheck } from "lucide-react";
+import { Users, FolderOpen, ShieldCheck, ShieldOff, ArrowLeft, UserX, UserCheck, MessageSquare } from "lucide-react";
 import { Link } from "wouter";
 import type { User } from "@shared/models/auth";
 import type { Project } from "@shared/schema";
@@ -63,6 +63,11 @@ export default function AdminPage() {
             <h1 className="font-bold text-lg" data-testid="text-admin-title">Admin Dashboard</h1>
           </div>
           <div className="flex items-center gap-3">
+            <Link href="/admin/coreqs">
+              <Button variant="outline" size="sm" className="gap-2" data-testid="button-prompt-mgmt">
+                <MessageSquare className="w-4 h-4" /> Prompt Management
+              </Button>
+            </Link>
             <Link href="/admin/auth-users">
               <Button variant="outline" size="sm" className="gap-2" data-testid="button-auth-users">
                 <Users className="w-4 h-4" /> Auth Users

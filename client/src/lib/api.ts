@@ -138,6 +138,33 @@ export const api = {
     listAdmin: () => fetchJson<ApiCoreQuery[]>("/api/admin/core-queries"),
     update: (locationKey: string, contextQuery: string) => apiRequest("PUT", `/api/admin/core-queries/${locationKey}`, { contextQuery }).then(json<ApiCoreQuery>),
   },
+
+  promptBlocks: {
+    list: () => fetchJson<ApiPromptBlock[]>("/api/admin/prompt-blocks"),
+    get: (id: string) => fetchJson<ApiPromptBlock>(`/api/admin/prompt-blocks/${id}`),
+    create: (data: { name: string; category: string; content?: string; description?: string; isActive?: boolean }) =>
+      apiRequest("POST", "/api/admin/prompt-blocks", data).then(json<ApiPromptBlock>),
+    update: (id: string, data: { name?: string; category?: string; content?: string; description?: string; isActive?: boolean; sortOrder?: number; changeNote?: string }) =>
+      apiRequest("PATCH", `/api/admin/prompt-blocks/${id}`, data).then(json<ApiPromptBlock>),
+    delete: (id: string) => apiRequest("DELETE", `/api/admin/prompt-blocks/${id}`),
+    versions: (blockId: string) => fetchJson<ApiPromptVersion[]>(`/api/admin/prompt-blocks/${blockId}/versions`),
+  },
+
+  promptLocations: {
+    list: (locationKey: string) => fetchJson<ApiPromptLocation[]>(`/api/admin/prompt-locations/${locationKey}`),
+    create: (data: { locationKey: string; blockId: string; sortOrder?: number; isActive?: boolean }) =>
+      apiRequest("POST", "/api/admin/prompt-locations", data).then(json<ApiPromptLocation>),
+    update: (id: string, data: { sortOrder?: number; isActive?: boolean }) =>
+      apiRequest("PATCH", `/api/admin/prompt-locations/${id}`, data).then(json<ApiPromptLocation>),
+    delete: (id: string) => apiRequest("DELETE", `/api/admin/prompt-locations/${id}`),
+    reorder: (locationKey: string, ids: string[]) =>
+      apiRequest("PUT", `/api/admin/prompt-locations/${locationKey}/reorder`, { ids }),
+  },
+
+  promptPreview: {
+    get: (locationKey: string, provider?: string) =>
+      fetchJson<ApiPromptPreview>(`/api/admin/prompt-preview/${locationKey}${provider ? `?provider=${provider}` : ""}`),
+  },
 };
 
 export type ApiCoreQuery = {
@@ -145,4 +172,40 @@ export type ApiCoreQuery = {
   locationKey: string;
   contextQuery: string;
   updatedAt: string;
+};
+
+export type ApiPromptBlock = {
+  id: string;
+  name: string;
+  category: string;
+  content: string;
+  description: string;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ApiPromptLocation = {
+  id: string;
+  locationKey: string;
+  blockId: string;
+  sortOrder: number;
+  isActive: boolean;
+};
+
+export type ApiPromptVersion = {
+  id: string;
+  blockId: string;
+  content: string;
+  version: number;
+  changedBy: string;
+  changeNote: string;
+  createdAt: string;
+};
+
+export type ApiPromptPreview = {
+  systemMessage: string;
+  provider: string;
+  tokenEstimate: number;
 };
