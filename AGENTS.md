@@ -69,7 +69,7 @@ No linter or test framework configured yet.
 1. **Auth is in `server/replit_integrations/auth/`** — Use `isAuthenticated` and `isAdmin` from there
 2. **Drizzle ORM, NOT Prisma** — Schema in `shared/schema.ts`, migrations via `drizzle-kit push`
 3. **No Redux/Zustand** — React Query for server state + localStorage (`projectStore.ts`) for selected project
-4. **All resources are user-scoped** — Every route must verify `userId` ownership via `verifyProjectOwnership()`
+4. **All resources are RBAC-scoped** — Every route must verify access via `checkProjectPermission()` (RBAC-based)
 5. **Polymorphic parentType** — `bucket_items` and `chat_messages` use `parentType` for different parent tables
 6. **React Query staleTime is Infinity** — After mutations, you MUST invalidate relevant queries
 7. **7 AI chat locations** — dashboard_page, goal_page, goal_bucket, lab_page, lab_bucket, deliverable_page, deliverable_bucket

@@ -3,39 +3,54 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, FolderOpen, ShieldCheck, ShieldOff, ArrowLeft, UserX, UserCheck, MessageSquare } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Users, FolderOpen, ArrowLeft, UserX, UserCheck, MessageSquare, Shield, ScrollText } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
-import type { User } from "@shared/models/auth";
 import type { Project } from "@shared/schema";
-import { fetchJson } from "@/lib/api";
+import { fetchJson, api } from "@/lib/api";
+import type { ApiUserWithRoles, ApiRoleWithPermissions } from "@/lib/api";
 import { apiRequest } from "@/lib/queryClient";
+import { AdminShell } from "@/components/admin/AdminShell";
 
-export default function AdminPage() {
+export default function AdminPage(): React.ReactElement {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
-  const { data: allUsers = [] } = useQuery<User[]>({
+  const { data: allUsers = [], isError: usersError } = useQuery<ApiUserWithRoles[]>({
     queryKey: ["/api/admin/users"],
     queryFn: () => fetchJson("/api/admin/users"),
   });
 
-  const { data: allProjects = [] } = useQuery<Project[]>({
+  const { data: allProjects = [], isError: projectsError } = useQuery<Project[]>({
     queryKey: ["/api/admin/projects"],
     queryFn: () => fetchJson("/api/admin/projects"),
   });
 
-  const { data: stats } = useQuery<{ totalUsers: number; totalProjects: number }>({
+  const { data: stats, isError: statsError } = useQuery<{ totalUsers: number; totalProjects: number }>({
     queryKey: ["/api/admin/stats"],
     queryFn: () => fetchJson("/api/admin/stats"),
   });
 
-  const toggleAdminMutation = useMutation({
-    mutationFn: async (userId: string) => {
-      const res = await apiRequest("PATCH", `/api/admin/users/${userId}/toggle-admin`);
-      return res.json();
+  const { data: allRoles = [], isLoading: rolesLoading, isError: rolesError } = useQuery<ApiRoleWithPermissions[]>({
+    queryKey: ["/api/admin/roles"],
+    queryFn: () => api.roles.list(),
+  });
+
+  const systemRoles = allRoles.filter((r) => r.type === "system");
+
+  const assignRoleMutation = useMutation({
+    mutationFn: async ({ userId, roleId }: { userId: string; roleId: string }) => {
+      return api.userRoles.assign(userId, roleId);
     },
-    onSuccess: () => {
+    onSuccess: (_data, { userId }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      const targetUser = allUsers.find((u) => u.id === userId);
+      toast({ title: "Role updated", description: `Updated role for ${targetUser?.email || "user"}` });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
 
@@ -46,11 +61,15 @@ export default function AdminPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "User status updated" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
 
   return (
-    <div className="min-h-screen bg-background" data-testid="admin-page">
+    <AdminShell>
       <div className="border-b bg-background">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -73,6 +92,16 @@ export default function AdminPage() {
                 <Users className="w-4 h-4" /> Auth Users
               </Button>
             </Link>
+            <Link href="/admin/roles">
+              <Button variant="outline" size="sm" className="gap-2" data-testid="button-roles">
+                <Shield className="w-4 h-4" /> Roles
+              </Button>
+            </Link>
+            <Link href="/admin/audit">
+              <Button variant="outline" size="sm" className="gap-2" data-testid="button-audit-log">
+                <ScrollText className="w-4 h-4" /> Audit Log
+              </Button>
+            </Link>
             <div className="text-sm text-muted-foreground" data-testid="text-admin-user">
               Signed in as {user?.firstName || user?.email || "Admin"}
             </div>
@@ -81,6 +110,11 @@ export default function AdminPage() {
       </div>
 
       <div className="max-w-6xl mx-auto px-6 py-8 space-y-8">
+        {(usersError || projectsError || statsError || rolesError) && (
+          <div className="bg-destructive/10 border border-destructive/20 rounded-md p-4 text-sm text-destructive" data-testid="admin-error-banner">
+            Failed to load some data. Please try refreshing the page.
+          </div>
+        )}
         <div className="grid md:grid-cols-2 gap-4">
           <Card data-testid="card-stat-users">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -128,9 +162,6 @@ export default function AdminPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant={u.isAdmin ? "default" : "outline"} data-testid={`badge-role-${u.id}`}>
-                      {u.isAdmin ? "Admin" : "User"}
-                    </Badge>
                     {u.isActive === false && (
                       <Badge variant="destructive" data-testid={`badge-deactivated-${u.id}`}>
                         Deactivated
@@ -139,21 +170,24 @@ export default function AdminPage() {
                     <span className="text-xs text-muted-foreground" data-testid={`text-user-joined-${u.id}`}>
                       Joined {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "N/A"}
                     </span>
-                    {u.id !== user?.id && (
+                    {u.id !== user?.id ? (
                       <>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => toggleAdminMutation.mutate(u.id)}
-                          disabled={toggleAdminMutation.isPending}
-                          data-testid={`button-toggle-admin-${u.id}`}
+                        <Select
+                          value={systemRoles.find((r) => r.name === u.primaryRole)?.id || ""}
+                          onValueChange={(roleId) => assignRoleMutation.mutate({ userId: u.id, roleId })}
+                          disabled={assignRoleMutation.isPending || rolesLoading}
                         >
-                          {u.isAdmin ? (
-                            <><ShieldOff className="w-4 h-4 mr-1" /> Remove Admin</>
-                          ) : (
-                            <><ShieldCheck className="w-4 h-4 mr-1" /> Make Admin</>
-                          )}
-                        </Button>
+                          <SelectTrigger className="w-[140px] h-8 text-xs" data-testid={`select-role-${u.id}`}>
+                            <SelectValue placeholder="Select role" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {systemRoles.map((r) => (
+                              <SelectItem key={r.id} value={r.id}>
+                                {r.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -168,6 +202,10 @@ export default function AdminPage() {
                           )}
                         </Button>
                       </>
+                    ) : (
+                      <Badge variant="outline" data-testid={`badge-role-${u.id}`}>
+                        {u.primaryRole} (you)
+                      </Badge>
                     )}
                   </div>
                 </div>
@@ -208,6 +246,6 @@ export default function AdminPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </AdminShell>
   );
 }

@@ -1,4 +1,4 @@
-import { eq, asc, and, isNull, isNotNull, lt } from "drizzle-orm";
+import { eq, asc, and, isNull, isNotNull, lt, inArray } from "drizzle-orm";
 import { db } from "./db";
 import {
   projects, briefSections, discoveryCategories, deliverables, bucketItems, chatMessages, coreQueries,
@@ -19,6 +19,7 @@ import {
 export interface IStorage {
   listProjects(userId?: string): Promise<Project[]>;
   getProject(id: string): Promise<Project | undefined>;
+  getProjectsByIds(ids: string[]): Promise<Project[]>;
   createProject(data: InsertProject): Promise<Project>;
   updateProject(id: string, data: Partial<InsertProject>): Promise<Project | undefined>;
   deleteProject(id: string): Promise<void>;
@@ -106,6 +107,11 @@ export class DatabaseStorage implements IStorage {
   async getProject(id: string): Promise<Project | undefined> {
     const [row] = await db.select().from(projects).where(eq(projects.id, id));
     return row;
+  }
+
+  async getProjectsByIds(ids: string[]): Promise<Project[]> {
+    if (ids.length === 0) return [];
+    return db.select().from(projects).where(inArray(projects.id, ids));
   }
 
   async createProject(data: InsertProject): Promise<Project> {

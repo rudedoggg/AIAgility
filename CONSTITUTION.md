@@ -184,7 +184,7 @@ shared/
 1. **Auth is in `server/auth/`** — Use `isAuthenticated` and `isAdmin` from there. JWT verified via Supabase JWT secret.
 2. **We use Drizzle ORM, NOT Prisma** — Schema is in `shared/schema.ts`. Migrations via `drizzle-kit push`.
 3. **No Redux/Zustand** — State management is React Query for server state + localStorage (`projectStore.ts`) for selected project. Do not introduce a state management library.
-4. **All resources are user-scoped** — Every API route must verify `userId` ownership. Use `verifyProjectOwnership()` in routes.
+4. **All resources are RBAC-scoped** — Every API route must verify access via `checkProjectPermission()` (RBAC-based).
 5. **Polymorphic parentType pattern** — `bucket_items` and `chat_messages` use `parentType` to reference different parent tables. Understand this before modifying.
 6. **React Query staleTime is Infinity** — Data is manually invalidated, not auto-refetched. After mutations, you MUST invalidate the relevant queries.
 7. **AI chat has 7 location types** — `dashboard_page`, `goal_page`, `goal_bucket`, `lab_page`, `lab_bucket`, `deliverable_page`, `deliverable_bucket`. CoreQueries prepend context per location.

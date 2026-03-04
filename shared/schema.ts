@@ -4,6 +4,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export * from "./models/auth";
+export * from "./models/rbac";
 
 export const projects = pgTable("projects", {
   id: varchar("id", { length: 64 }).primaryKey().default(sql`gen_random_uuid()`),
@@ -160,3 +161,21 @@ export type PromptBlockForLocation = {
   content: string;
   locationSortOrder: number;
 };
+
+// === PROJECT MEMBERS (defined here to co-locate with projects FK) ===
+import { roles } from "./models/rbac";
+
+export const projectMembers = pgTable("project_members", {
+  id: varchar("id", { length: 64 }).primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id", { length: 64 }).notNull().references(() => projects.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 255 }).notNull(),
+  roleId: varchar("role_id", { length: 64 }).notNull().references(() => roles.id, { onDelete: "cascade" }),
+  joinedAt: timestamp("joined_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("project_members_project_user_idx").on(table.projectId, table.userId),
+  index("project_members_user_id_idx").on(table.userId),
+]);
+
+export const insertProjectMemberSchema = createInsertSchema(projectMembers).omit({ id: true, joinedAt: true });
+export type ProjectMember = typeof projectMembers.$inferSelect;
+export type InsertProjectMember = z.infer<typeof insertProjectMemberSchema>;

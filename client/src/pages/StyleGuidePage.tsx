@@ -1,10 +1,10 @@
-import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
+import { AdminShell } from "@/components/admin/AdminShell";
 
 const COLOR_TOKENS = [
     { label: "Background", var: "--background", tw: "bg-background" },
@@ -37,18 +37,10 @@ const RADII = [
 ];
 
 export default function StyleGuidePage(): React.ReactElement {
-    const { user } = useAuth();
-
-    if (!user?.isAdmin) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-background" data-testid="style-guide-forbidden">
-                <p className="text-muted-foreground text-lg">Access denied. Admin only.</p>
-            </div>
-        );
-    }
+    // Permission check handled by AdminRoute in App.tsx
 
     return (
-        <div className="min-h-screen bg-background" data-testid="style-guide-page">
+        <AdminShell>
             {/* Header Bar */}
             <div className="border-b bg-background">
                 <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -252,6 +244,6 @@ export default function StyleGuidePage(): React.ReactElement {
                 </section>
 
             </div>
-        </div>
+        </AdminShell>
     );
 }

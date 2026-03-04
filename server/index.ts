@@ -3,6 +3,8 @@ import cors from "cors";
 import { registerRoutes } from "./routes";
 import { createServer } from "http";
 import { storage } from "./storage";
+import { seedRbacDefaults } from "./auth/rbac-seed";
+import { migrateExistingData } from "./auth/rbac-migrate";
 
 const app = express();
 const httpServer = createServer(app);
@@ -33,6 +35,9 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+
+// Trust first proxy (Railway/Vercel) for accurate req.ip and x-forwarded-for
+app.set("trust proxy", 1);
 
 export function log(message: string, source = "express"): void {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -83,6 +88,8 @@ async function runCleanup(): Promise<void> {
 }
 
 (async () => {
+  await seedRbacDefaults();
+  await migrateExistingData();
   await registerRoutes(httpServer, app);
 
   runCleanup();
