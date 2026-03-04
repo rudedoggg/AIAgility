@@ -314,9 +314,10 @@ export async function registerRoutes(
 
   app.post("/api/items", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
-    const projectId = await storage.getProjectIdForParent(req.body.parentId, req.body.parentType);
+    const { parentId, parentType, type, title, preview, date, url, fileName, fileSizeLabel, sortOrder } = req.body;
+    const projectId = await storage.getProjectIdForParent(parentId, parentType);
     if (!projectId || !await checkProjectPermission(req, projectId, userId, "project.edit")) return res.status(404).json({ message: "Not found" });
-    const row = await storage.createBucketItem(req.body);
+    const row = await storage.createBucketItem({ parentId, parentType, type, title, preview, date, url, fileName, fileSizeLabel, sortOrder });
     audit(req, "create", "bucket_item", row.id);
     res.status(201).json(row);
   });
@@ -367,8 +368,8 @@ export async function registerRoutes(
   // === AI CHAT (SSE streaming) ===
   const chatRequestSchema = z.object({
     parentId: z.string().min(1),
-    parentType: z.string().min(1),
-    content: z.string().min(1),
+    parentType: z.string().min(1).max(64),
+    content: z.string().min(1).max(50000),
   });
 
   app.post("/api/chat", isAuthenticated, async (req: Request, res: Response) => {
@@ -449,16 +450,21 @@ export async function registerRoutes(
 
       res.write(`data: ${JSON.stringify({ type: "done", userMessageId: userMessage.id, aiMessageId: aiMessage.id })}\n\n`);
     } catch (err) {
-      const errorText = err instanceof Error ? err.message : "AI provider error";
+      const internalError = err instanceof Error ? err.message : "AI provider error";
+      const safeErrorText = "Sorry, something went wrong. Please try again.";
 
-      // Save error as AI message — wrapped so a storage failure can't prevent SSE cleanup
+      // Log full error server-side for debugging
+      const { log } = await import("./index");
+      log(`AI chat error: ${internalError}`, "chat");
+
+      // Save safe error as AI message — wrapped so a storage failure can't prevent SSE cleanup
       try {
         const errTimestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
         await storage.createChatMessage({
           parentId,
           parentType,
           role: "ai",
-          content: `Sorry, I encountered an error: ${errorText}`,
+          content: safeErrorText,
           timestamp: errTimestamp,
           hasSaveableContent: false,
           saved: false,
@@ -467,7 +473,7 @@ export async function registerRoutes(
         // Storage failed — still send the SSE error event below
       }
 
-      res.write(`data: ${JSON.stringify({ type: "error", message: errorText })}\n\n`);
+      res.write(`data: ${JSON.stringify({ type: "error", message: safeErrorText })}\n\n`);
     }
 
     res.end();

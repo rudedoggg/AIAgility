@@ -21,6 +21,13 @@ import { api } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { usePromptDialog } from "@/components/shared/PromptDialogProvider";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 function generateTemplateFromSnippet(projectName: string, snippet: string): {
   executiveSummary: string;
@@ -110,14 +117,6 @@ function generateTemplateFromSnippet(projectName: string, snippet: string): {
     ],
   };
 }
-
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 export function Header(): React.ReactElement {
   const [location, setLocation] = useLocation();
