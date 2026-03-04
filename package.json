@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
     "dev:client": "vite dev --port 5173",
-    "dev:server": "NODE_ENV=development tsx watch server/index.ts",
+    "dev:server": "NODE_ENV=development tsx watch --env-file=.env server/index.ts",
     "build": "npm run build:client && npm run build:server",
     "build:client": "vite build",
     "build:server": "tsx script/build.ts",
@@ -89,6 +89,7 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.0",
     "@types/node": "^20.19.0",
+    "@types/pg": "^8.16.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@types/ws": "^8.5.13",
