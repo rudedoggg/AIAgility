@@ -97,14 +97,15 @@ async function runCleanup(): Promise<void> {
 
   app.use((err: Error & { status?: number; statusCode?: number }, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
 
-    console.error("Internal Server Error:", err);
+    log(`Unhandled error (${status}): ${err.message}`, "error");
 
     if (res.headersSent) {
       return next(err);
     }
 
+    // Only expose error details for client errors (4xx); hide internals for 5xx
+    const message = status < 500 ? (err.message || "Bad Request") : "Internal Server Error";
     return res.status(status).json({ message });
   });
 
