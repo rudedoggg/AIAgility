@@ -11,7 +11,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Search } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Plus, Search, Info } from "lucide-react";
 
 const CATEGORIES = [
   { value: "all", label: "All Categories" },
@@ -22,12 +28,12 @@ const CATEGORIES = [
   { value: "context_template", label: "Context Template" },
 ];
 
-const CATEGORY_LABELS: Record<string, string> = {
-  identity: "Identity",
-  role: "Role",
-  constraints: "Constraints",
-  task: "Task",
-  context_template: "Context Template",
+const CATEGORY_INFO: Record<string, { label: string; tip: string }> = {
+  identity: { label: "Identity", tip: "Sets who the AI is — its name and persona. Most locations need exactly one." },
+  role: { label: "Role", tip: "Defines the AI's expertise and responsibilities for this context." },
+  constraints: { label: "Constraints", tip: "Rules the AI must follow — tone, length limits, topics to avoid." },
+  task: { label: "Task", tip: "The specific job the AI should do when users chat in this location." },
+  context_template: { label: "Context Template", tip: "Injects live project data at runtime via {{variable}} placeholders." },
 };
 
 type BlockLibraryProps = {
@@ -63,8 +69,13 @@ export function BlockLibrary({ blocks, isLoading, onEditBlock, onCreateBlock }: 
     <div className="h-full flex flex-col">
       <div className="px-4 py-3 border-b space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">Block Library</h2>
-          <Button size="sm" className="gap-1.5 h-7 text-xs" onClick={onCreateBlock}>
+          <div>
+            <h2 className="text-sm font-semibold">Block Library</h2>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              Reusable building blocks that shape AI behavior. Click any block to edit it.
+            </p>
+          </div>
+          <Button size="sm" className="gap-1.5 h-7 text-xs shrink-0" onClick={onCreateBlock}>
             <Plus className="w-3.5 h-3.5" />
             New Block
           </Button>
@@ -98,15 +109,34 @@ export function BlockLibrary({ blocks, isLoading, onEditBlock, onCreateBlock }: 
         {isLoading ? (
           <div className="text-sm text-muted-foreground text-center py-10">Loading...</div>
         ) : filtered.length === 0 ? (
-          <div className="text-sm text-muted-foreground text-center py-10">
-            {blocks.length === 0 ? "No blocks yet. Create one to get started." : "No blocks match your filters."}
+          <div className="text-sm text-muted-foreground text-center py-10 px-6">
+            {blocks.length === 0 ? (
+              <div className="space-y-2">
+                <p className="font-medium text-foreground">No blocks yet</p>
+                <p className="text-xs">Create your first block to start customizing how AI assistants behave. Start with an Identity block to give the AI a persona, then add Role and Task blocks.</p>
+              </div>
+            ) : (
+              "No blocks match your filters."
+            )}
           </div>
         ) : (
           <div className="py-1">
             {Array.from(grouped.entries()).map(([cat, catBlocks]) => (
               <div key={cat}>
-                <div className="sticky top-0 bg-muted/80 backdrop-blur-sm px-4 py-1.5 text-[11px] font-mono uppercase tracking-wider text-muted-foreground border-b">
-                  {CATEGORY_LABELS[cat] ?? cat}
+                <div className="sticky top-0 bg-muted/80 backdrop-blur-sm px-4 py-1.5 text-[11px] font-mono uppercase tracking-wider text-muted-foreground border-b flex items-center gap-1.5">
+                  {CATEGORY_INFO[cat]?.label ?? cat}
+                  {CATEGORY_INFO[cat]?.tip && (
+                    <TooltipProvider delayDuration={200}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="w-3 h-3 text-muted-foreground/60 hover:text-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="max-w-[220px] text-xs">
+                          {CATEGORY_INFO[cat].tip}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
                 </div>
                 {catBlocks.map((block) => (
                   <button

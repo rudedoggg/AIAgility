@@ -24,11 +24,11 @@ import { useToast } from "@/hooks/use-toast";
 import { Trash2, History, RotateCcw, ChevronDown, ChevronRight } from "lucide-react";
 
 const CATEGORIES = [
-  { value: "identity", label: "Identity" },
-  { value: "role", label: "Role" },
-  { value: "constraints", label: "Constraints" },
-  { value: "task", label: "Task" },
-  { value: "context_template", label: "Context Template" },
+  { value: "identity", label: "Identity", description: "Who the AI is — persona and name" },
+  { value: "role", label: "Role", description: "What the AI does — expertise and responsibilities" },
+  { value: "constraints", label: "Constraints", description: "Rules to follow — tone, limits, forbidden topics" },
+  { value: "task", label: "Task", description: "The specific job for this chat location" },
+  { value: "context_template", label: "Context Template", description: "Dynamic data injected at runtime via {{variables}}" },
 ];
 
 type BlockEditorDialogProps = {
@@ -51,13 +51,13 @@ export function BlockEditorDialog({ open, onOpenChange, blockId }: BlockEditorDi
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const { data: block } = useQuery({
-    queryKey: ["admin", "prompt-blocks", blockId],
+    queryKey: ["/api/admin/prompt-blocks", blockId],
     queryFn: () => api.promptBlocks.get(blockId!),
     enabled: isEditMode && open,
   });
 
   const { data: versions = [] } = useQuery({
-    queryKey: ["admin", "prompt-blocks", blockId, "versions"],
+    queryKey: ["/api/admin/prompt-blocks", blockId, "versions"],
     queryFn: () => api.promptBlocks.versions(blockId!),
     enabled: isEditMode && open && showVersions,
   });
@@ -86,9 +86,9 @@ export function BlockEditorDialog({ open, onOpenChange, blockId }: BlockEditorDi
   }, [open]);
 
   function invalidateAll(): void {
-    queryClient.invalidateQueries({ queryKey: ["admin", "prompt-blocks"] });
-    queryClient.invalidateQueries({ queryKey: ["admin", "prompt-locations"] });
-    queryClient.invalidateQueries({ queryKey: ["admin", "prompt-preview"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/prompt-blocks"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/prompt-locations"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/prompt-preview"] });
   }
 
   const createMutation = useMutation({
@@ -146,6 +146,11 @@ export function BlockEditorDialog({ open, onOpenChange, blockId }: BlockEditorDi
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditMode ? "Edit Block" : "New Block"}</DialogTitle>
+          <p className="text-xs text-muted-foreground">
+            {isEditMode
+              ? "Changes are versioned automatically. Use the change note to document what you changed and why."
+              : "Create a reusable prompt block. After creating it, assign it to one or more chat locations to shape how the AI responds to users there."}
+          </p>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
@@ -158,6 +163,7 @@ export function BlockEditorDialog({ open, onOpenChange, blockId }: BlockEditorDi
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Core Identity"
               />
+              <p className="text-[11px] text-muted-foreground">A short, descriptive label visible only to admins.</p>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="block-category">Category</Label>
@@ -167,8 +173,11 @@ export function BlockEditorDialog({ open, onOpenChange, blockId }: BlockEditorDi
                 </SelectTrigger>
                 <SelectContent>
                   {CATEGORIES.map((c) => (
-                    <SelectItem key={c.value} value={c.value}>
-                      {c.label}
+                    <SelectItem key={c.value} value={c.value} textValue={c.label}>
+                      <div>
+                        <div>{c.label}</div>
+                        <div className="text-xs text-muted-foreground">{c.description}</div>
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -184,6 +193,7 @@ export function BlockEditorDialog({ open, onOpenChange, blockId }: BlockEditorDi
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Brief description of this block's purpose"
             />
+            <p className="text-[11px] text-muted-foreground">Helps other admins understand this block's intent. Not sent to the AI.</p>
           </div>
 
           <div className="space-y-1.5">
@@ -200,6 +210,9 @@ export function BlockEditorDialog({ open, onOpenChange, blockId }: BlockEditorDi
               placeholder="Enter the prompt block content..."
               className="min-h-[200px] resize-y text-sm font-mono"
             />
+            <p className="text-[11px] text-muted-foreground">
+              This text is sent to the AI as part of its system instructions. Write in second person ("You are...", "Your role is..."). Be specific — vague instructions produce vague responses.
+            </p>
           </div>
 
           {isEditMode && (
@@ -211,6 +224,7 @@ export function BlockEditorDialog({ open, onOpenChange, blockId }: BlockEditorDi
                 onChange={(e) => setChangeNote(e.target.value)}
                 placeholder="What changed and why (optional)"
               />
+              <p className="text-[11px] text-muted-foreground">Saved with the version history so you can track why prompts evolved over time.</p>
             </div>
           )}
 
