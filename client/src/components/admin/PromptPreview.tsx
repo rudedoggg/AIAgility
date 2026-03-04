@@ -9,7 +9,7 @@ type PromptPreviewProps = {
 
 export function PromptPreview({ locationKey }: PromptPreviewProps): React.ReactElement {
   const { data: preview, isLoading } = useQuery({
-    queryKey: ["admin", "prompt-preview", locationKey],
+    queryKey: ["/api/admin/prompt-preview", locationKey],
     queryFn: () => api.promptPreview.get(locationKey),
   });
 

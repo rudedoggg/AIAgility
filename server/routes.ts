@@ -3,10 +3,11 @@ import { type Server } from "http";
 import { z } from "zod";
 import { storage } from "./storage";
 import { seedDemoData } from "./seed";
-import { isAuthenticated, isAdmin, authStorage } from "./auth";
+import { isAuthenticated, authStorage, requirePermission, checkProjectPermission, rbacStorage } from "./auth";
+import { audit } from "./auth/audit";
 import { db } from "./db";
-import { users, projects } from "@shared/schema";
-import { eq, sql } from "drizzle-orm";
+import { users, projects, auditLog } from "@shared/schema";
+import { eq, sql, desc, and, gte, lte } from "drizzle-orm";
 import { getAIProvider, type AIMessage } from "./ai";
 import { assemblePrompt, PROMPT_CATEGORIES } from "./prompts";
 import { createClient } from "@supabase/supabase-js";
@@ -19,36 +20,14 @@ const syncUserSchema = z.object({
 });
 
 function getUserId(req: Request): string {
-  return req.userId!;
+  if (!req.userId) throw new Error("userId not set on authenticated request");
+  return req.userId;
 }
 
 function param(req: Request, key: string): string {
-  return req.params[key] as string;
-}
-
-async function verifyProjectOwnership(projectId: string, userId: string): Promise<boolean> {
-  const project = await storage.getProject(projectId);
-  return !!project && project.userId === userId;
-}
-
-async function getProjectIdForChatParent(parentId: string, parentType: string): Promise<string | undefined> {
-  switch (parentType) {
-    case "dashboard_page":
-    case "brief_page":
-    case "discovery_page":
-    case "deliverable_page": {
-      const project = await storage.getProject(parentId);
-      return project?.id;
-    }
-    case "brief_section":
-      return storage.getProjectIdForBrief(parentId);
-    case "discovery_category":
-      return storage.getProjectIdForDiscoveryCategory(parentId);
-    case "deliverable_asset":
-      return storage.getProjectIdForDeliverable(parentId);
-    default:
-      return undefined;
-  }
+  const value = req.params[key];
+  if (typeof value !== "string") throw new Error(`Missing route param: ${key}`);
+  return value;
 }
 
 export async function registerRoutes(
@@ -71,25 +50,51 @@ export async function registerRoutes(
       lastName: lastName || null,
       profileImageUrl: profileImageUrl || null,
     });
+    audit(req, "sync", "user", userId);
     res.json(user);
   });
 
-  // === GET CURRENT USER ===
+  // === GET CURRENT USER (with permissions) ===
   app.get("/api/auth/user", isAuthenticated, async (req: Request, res: Response) => {
     const userId = getUserId(req);
     const user = await authStorage.getUser(userId);
     if (!user) return res.status(404).json({ message: "User not found" });
-    res.json(user);
+
+    // Resolve user's system permissions and roles for the frontend
+    const systemPermissions = await rbacStorage.getUserSystemPermissions(userId);
+    const userRolesList = await rbacStorage.getUserRoles(userId);
+    const systemRoles = userRolesList.filter((r) => r.type === "system").map((r) => r.name);
+
+    res.json({
+      ...user,
+      systemPermissions,
+      systemRoles,
+    });
   });
 
   // === PROJECTS ===
   app.get("/api/projects", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
+    // Get owned projects
     let rows = await storage.listProjects(userId);
     if (rows.length === 0) {
       await seedDemoData(userId);
       rows = await storage.listProjects(userId);
     }
+
+    // Also include projects where user is a member but not owner (batch query)
+    const memberProjectIds = await rbacStorage.getProjectsForUser(userId);
+    const ownedIds = new Set(rows.map((r) => r.id));
+    const missingIds = memberProjectIds.filter((pid) => !ownedIds.has(pid));
+    if (missingIds.length > 0) {
+      const memberProjects = await storage.getProjectsByIds(missingIds);
+      for (const project of memberProjects) {
+        if (!project.archivedAt) {
+          rows.push(project);
+        }
+      }
+    }
+
     res.json(rows);
   });
 
@@ -101,156 +106,200 @@ export async function registerRoutes(
 
   app.patch("/api/projects/:id/restore", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
-    if (!await verifyProjectOwnership(param(req, "id"), userId)) return res.status(404).json({ message: "Not found" });
+    if (!await checkProjectPermission(req, param(req, "id"), userId, "project.edit")) return res.status(404).json({ message: "Not found" });
     const project = await storage.getProject(param(req, "id"));
     if (!project?.archivedAt) return res.status(400).json({ message: "Project is not archived" });
     const restored = await storage.restoreProject(param(req, "id"));
     if (!restored) return res.status(404).json({ message: "Not found" });
+    audit(req, "update", "project", param(req, "id"), { action: "restore" });
     res.json(restored);
   });
 
   app.get("/api/projects/:id", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
+    if (!await checkProjectPermission(req, param(req, "id"), userId, "project.view")) return res.status(404).json({ message: "Not found" });
     const row = await storage.getProject(param(req, "id"));
-    if (!row || row.userId !== userId) return res.status(404).json({ message: "Not found" });
+    if (!row) return res.status(404).json({ message: "Not found" });
     res.json(row);
   });
 
   app.post("/api/projects", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
-    const row = await storage.createProject({ ...req.body, userId });
+    const { name, summary, executiveSummary, dashboardStatus } = req.body;
+    const ownerRole = await rbacStorage.getRoleByName("owner");
+    if (!ownerRole) {
+      return res.status(500).json({ message: "Owner role not found — RBAC seed may not have run" });
+    }
+
+    const row = await storage.createProject({ name, summary, executiveSummary, dashboardStatus, userId });
+    await rbacStorage.addProjectMember(row.id, userId, ownerRole.id);
+
+    audit(req, "create", "project", row.id, { name: row.name });
     res.status(201).json(row);
   });
 
   app.patch("/api/projects/:id", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
-    if (!await verifyProjectOwnership(param(req, "id"), userId)) return res.status(404).json({ message: "Not found" });
-    const row = await storage.updateProject(param(req, "id"), req.body);
+    if (!await checkProjectPermission(req, param(req, "id"), userId, "project.edit")) return res.status(404).json({ message: "Not found" });
+    const { name, summary, executiveSummary, dashboardStatus } = req.body;
+    const row = await storage.updateProject(param(req, "id"), { name, summary, executiveSummary, dashboardStatus });
     if (!row) return res.status(404).json({ message: "Not found" });
+    audit(req, "update", "project", param(req, "id"));
     res.json(row);
   });
 
   app.delete("/api/projects/:id", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
-    if (!await verifyProjectOwnership(param(req, "id"), userId)) return res.status(404).json({ message: "Not found" });
+    if (!await checkProjectPermission(req, param(req, "id"), userId, "project.delete")) return res.status(404).json({ message: "Not found" });
     await storage.deleteProject(param(req, "id"));
+    audit(req, "delete", "project", param(req, "id"));
     res.status(204).end();
   });
 
   // === BRIEF SECTIONS ===
   app.get("/api/projects/:projectId/brief", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
-    if (!await verifyProjectOwnership(param(req, "projectId"), userId)) return res.status(404).json({ message: "Not found" });
+    if (!await checkProjectPermission(req, param(req, "projectId"), userId, "project.view")) return res.status(404).json({ message: "Not found" });
     const rows = await storage.listBriefSections(param(req, "projectId"));
     res.json(rows);
   });
 
   app.post("/api/projects/:projectId/brief", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
-    if (!await verifyProjectOwnership(param(req, "projectId"), userId)) return res.status(404).json({ message: "Not found" });
-    const row = await storage.createBriefSection({ ...req.body, projectId: param(req, "projectId") });
+    if (!await checkProjectPermission(req, param(req, "projectId"), userId, "project.brief.edit")) return res.status(404).json({ message: "Not found" });
+    const { genericName, subtitle, completeness, totalItems, completedItems, content, sortOrder } = req.body;
+    const row = await storage.createBriefSection({ genericName, subtitle, completeness, totalItems, completedItems, content, sortOrder, projectId: param(req, "projectId") });
+    audit(req, "create", "brief_section", row.id);
     res.status(201).json(row);
   });
 
   app.patch("/api/brief/:id", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
     const projectId = await storage.getProjectIdForBrief(param(req, "id"));
-    if (!projectId || !await verifyProjectOwnership(projectId, userId)) return res.status(404).json({ message: "Not found" });
-    const row = await storage.updateBriefSection(param(req, "id"), req.body);
+    if (!projectId || !await checkProjectPermission(req, projectId, userId, "project.brief.edit")) return res.status(404).json({ message: "Not found" });
+    const { genericName, subtitle, completeness, totalItems, completedItems, content, sortOrder } = req.body;
+    const row = await storage.updateBriefSection(param(req, "id"), { genericName, subtitle, completeness, totalItems, completedItems, content, sortOrder });
     if (!row) return res.status(404).json({ message: "Not found" });
+    audit(req, "update", "brief_section", param(req, "id"));
     res.json(row);
   });
 
   app.delete("/api/brief/:id", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
     const projectId = await storage.getProjectIdForBrief(param(req, "id"));
-    if (!projectId || !await verifyProjectOwnership(projectId, userId)) return res.status(404).json({ message: "Not found" });
+    if (!projectId || !await checkProjectPermission(req, projectId, userId, "project.brief.edit")) return res.status(404).json({ message: "Not found" });
     await storage.deleteBriefSection(param(req, "id"));
+    audit(req, "delete", "brief_section", param(req, "id"));
     res.status(204).end();
   });
 
   app.put("/api/projects/:projectId/brief/reorder", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
-    if (!await verifyProjectOwnership(param(req, "projectId"), userId)) return res.status(404).json({ message: "Not found" });
-    await storage.reorderBriefSections(param(req, "projectId"), req.body.ids);
+    if (!await checkProjectPermission(req, param(req, "projectId"), userId, "project.brief.edit")) return res.status(404).json({ message: "Not found" });
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || !ids.every((id: unknown) => typeof id === "string")) {
+      return res.status(400).json({ message: "ids must be an array of strings" });
+    }
+    await storage.reorderBriefSections(param(req, "projectId"), ids);
+    audit(req, "update", "brief_sections", undefined, { action: "reorder" });
     res.status(204).end();
   });
 
   // === DISCOVERY CATEGORIES ===
   app.get("/api/projects/:projectId/discovery", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
-    if (!await verifyProjectOwnership(param(req, "projectId"), userId)) return res.status(404).json({ message: "Not found" });
+    if (!await checkProjectPermission(req, param(req, "projectId"), userId, "project.view")) return res.status(404).json({ message: "Not found" });
     const rows = await storage.listDiscoveryCategories(param(req, "projectId"));
     res.json(rows);
   });
 
   app.post("/api/projects/:projectId/discovery", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
-    if (!await verifyProjectOwnership(param(req, "projectId"), userId)) return res.status(404).json({ message: "Not found" });
-    const row = await storage.createDiscoveryCategory({ ...req.body, projectId: param(req, "projectId") });
+    if (!await checkProjectPermission(req, param(req, "projectId"), userId, "project.discovery.edit")) return res.status(404).json({ message: "Not found" });
+    const { name, sortOrder } = req.body;
+    const row = await storage.createDiscoveryCategory({ name, sortOrder, projectId: param(req, "projectId") });
+    audit(req, "create", "discovery_category", row.id);
     res.status(201).json(row);
   });
 
   app.patch("/api/discovery/:id", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
     const projectId = await storage.getProjectIdForDiscoveryCategory(param(req, "id"));
-    if (!projectId || !await verifyProjectOwnership(projectId, userId)) return res.status(404).json({ message: "Not found" });
-    const row = await storage.updateDiscoveryCategory(param(req, "id"), req.body);
+    if (!projectId || !await checkProjectPermission(req, projectId, userId, "project.discovery.edit")) return res.status(404).json({ message: "Not found" });
+    const { name, sortOrder } = req.body;
+    const row = await storage.updateDiscoveryCategory(param(req, "id"), { name, sortOrder });
     if (!row) return res.status(404).json({ message: "Not found" });
+    audit(req, "update", "discovery_category", param(req, "id"));
     res.json(row);
   });
 
   app.delete("/api/discovery/:id", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
     const projectId = await storage.getProjectIdForDiscoveryCategory(param(req, "id"));
-    if (!projectId || !await verifyProjectOwnership(projectId, userId)) return res.status(404).json({ message: "Not found" });
+    if (!projectId || !await checkProjectPermission(req, projectId, userId, "project.discovery.edit")) return res.status(404).json({ message: "Not found" });
     await storage.deleteDiscoveryCategory(param(req, "id"));
+    audit(req, "delete", "discovery_category", param(req, "id"));
     res.status(204).end();
   });
 
   app.put("/api/projects/:projectId/discovery/reorder", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
-    if (!await verifyProjectOwnership(param(req, "projectId"), userId)) return res.status(404).json({ message: "Not found" });
-    await storage.reorderDiscoveryCategories(param(req, "projectId"), req.body.ids);
+    if (!await checkProjectPermission(req, param(req, "projectId"), userId, "project.discovery.edit")) return res.status(404).json({ message: "Not found" });
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || !ids.every((id: unknown) => typeof id === "string")) {
+      return res.status(400).json({ message: "ids must be an array of strings" });
+    }
+    await storage.reorderDiscoveryCategories(param(req, "projectId"), ids);
+    audit(req, "update", "discovery_categories", undefined, { action: "reorder" });
     res.status(204).end();
   });
 
   // === DELIVERABLES ===
   app.get("/api/projects/:projectId/deliverables", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
-    if (!await verifyProjectOwnership(param(req, "projectId"), userId)) return res.status(404).json({ message: "Not found" });
+    if (!await checkProjectPermission(req, param(req, "projectId"), userId, "project.view")) return res.status(404).json({ message: "Not found" });
     const rows = await storage.listDeliverables(param(req, "projectId"));
     res.json(rows);
   });
 
   app.post("/api/projects/:projectId/deliverables", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
-    if (!await verifyProjectOwnership(param(req, "projectId"), userId)) return res.status(404).json({ message: "Not found" });
-    const row = await storage.createDeliverable({ ...req.body, projectId: param(req, "projectId") });
+    if (!await checkProjectPermission(req, param(req, "projectId"), userId, "project.deliverables.edit")) return res.status(404).json({ message: "Not found" });
+    const { title, subtitle, completeness, status, content, engaged, sortOrder } = req.body;
+    const row = await storage.createDeliverable({ title, subtitle, completeness, status, content, engaged, sortOrder, projectId: param(req, "projectId") });
+    audit(req, "create", "deliverable", row.id);
     res.status(201).json(row);
   });
 
   app.patch("/api/deliverables/:id", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
     const projectId = await storage.getProjectIdForDeliverable(param(req, "id"));
-    if (!projectId || !await verifyProjectOwnership(projectId, userId)) return res.status(404).json({ message: "Not found" });
-    const row = await storage.updateDeliverable(param(req, "id"), req.body);
+    if (!projectId || !await checkProjectPermission(req, projectId, userId, "project.deliverables.edit")) return res.status(404).json({ message: "Not found" });
+    const { title, subtitle, completeness, status, content, engaged, sortOrder } = req.body;
+    const row = await storage.updateDeliverable(param(req, "id"), { title, subtitle, completeness, status, content, engaged, sortOrder });
     if (!row) return res.status(404).json({ message: "Not found" });
+    audit(req, "update", "deliverable", param(req, "id"));
     res.json(row);
   });
 
   app.delete("/api/deliverables/:id", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
     const projectId = await storage.getProjectIdForDeliverable(param(req, "id"));
-    if (!projectId || !await verifyProjectOwnership(projectId, userId)) return res.status(404).json({ message: "Not found" });
+    if (!projectId || !await checkProjectPermission(req, projectId, userId, "project.deliverables.edit")) return res.status(404).json({ message: "Not found" });
     await storage.deleteDeliverable(param(req, "id"));
+    audit(req, "delete", "deliverable", param(req, "id"));
     res.status(204).end();
   });
 
   app.put("/api/projects/:projectId/deliverables/reorder", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
-    if (!await verifyProjectOwnership(param(req, "projectId"), userId)) return res.status(404).json({ message: "Not found" });
-    await storage.reorderDeliverables(param(req, "projectId"), req.body.ids);
+    if (!await checkProjectPermission(req, param(req, "projectId"), userId, "project.deliverables.edit")) return res.status(404).json({ message: "Not found" });
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || !ids.every((id: unknown) => typeof id === "string")) {
+      return res.status(400).json({ message: "ids must be an array of strings" });
+    }
+    await storage.reorderDeliverables(param(req, "projectId"), ids);
+    audit(req, "update", "deliverables", undefined, { action: "reorder" });
     res.status(204).end();
   });
 
@@ -258,7 +307,7 @@ export async function registerRoutes(
   app.get("/api/items/:parentType/:parentId", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
     const projectId = await storage.getProjectIdForParent(param(req, "parentId"), param(req, "parentType"));
-    if (!projectId || !await verifyProjectOwnership(projectId, userId)) return res.status(404).json({ message: "Not found" });
+    if (!projectId || !await checkProjectPermission(req, projectId, userId, "project.view")) return res.status(404).json({ message: "Not found" });
     const rows = await storage.listBucketItems(param(req, "parentId"), param(req, "parentType"));
     res.json(rows);
   });
@@ -266,8 +315,9 @@ export async function registerRoutes(
   app.post("/api/items", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
     const projectId = await storage.getProjectIdForParent(req.body.parentId, req.body.parentType);
-    if (!projectId || !await verifyProjectOwnership(projectId, userId)) return res.status(404).json({ message: "Not found" });
+    if (!projectId || !await checkProjectPermission(req, projectId, userId, "project.edit")) return res.status(404).json({ message: "Not found" });
     const row = await storage.createBucketItem(req.body);
+    audit(req, "create", "bucket_item", row.id);
     res.status(201).json(row);
   });
 
@@ -276,8 +326,9 @@ export async function registerRoutes(
     const item = await storage.getBucketItem(param(req, "id"));
     if (!item) return res.status(404).json({ message: "Not found" });
     const projectId = await storage.getProjectIdForParent(item.parentId, item.parentType);
-    if (!projectId || !await verifyProjectOwnership(projectId, userId)) return res.status(404).json({ message: "Not found" });
+    if (!projectId || !await checkProjectPermission(req, projectId, userId, "project.edit")) return res.status(404).json({ message: "Not found" });
     await storage.deleteBucketItem(param(req, "id"));
+    audit(req, "delete", "bucket_item", param(req, "id"));
     res.status(204).end();
   });
 
@@ -285,16 +336,18 @@ export async function registerRoutes(
   app.get("/api/messages/:parentType/:parentId", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
     const projectId = await storage.getProjectIdForParent(param(req, "parentId"), param(req, "parentType"));
-    if (!projectId || !await verifyProjectOwnership(projectId, userId)) return res.status(404).json({ message: "Not found" });
+    if (!projectId || !await checkProjectPermission(req, projectId, userId, "project.view")) return res.status(404).json({ message: "Not found" });
     const rows = await storage.listChatMessages(param(req, "parentId"), param(req, "parentType"));
     res.json(rows);
   });
 
   app.post("/api/messages", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
-    const projectId = await storage.getProjectIdForParent(req.body.parentId, req.body.parentType);
-    if (!projectId || !await verifyProjectOwnership(projectId, userId)) return res.status(404).json({ message: "Not found" });
-    const row = await storage.createChatMessage(req.body);
+    const { parentId, parentType, content, timestamp, hasSaveableContent, saved, sortOrder } = req.body;
+    const projectId = await storage.getProjectIdForParent(parentId, parentType);
+    if (!projectId || !await checkProjectPermission(req, projectId, userId, "project.chat.use")) return res.status(404).json({ message: "Not found" });
+    const row = await storage.createChatMessage({ parentId, parentType, role: "user", content, timestamp, hasSaveableContent, saved, sortOrder });
+    audit(req, "create", "chat_message", row.id);
     res.status(201).json(row);
   });
 
@@ -303,9 +356,11 @@ export async function registerRoutes(
     const message = await storage.getChatMessage(param(req, "id"));
     if (!message) return res.status(404).json({ message: "Not found" });
     const projectId = await storage.getProjectIdForParent(message.parentId, message.parentType);
-    if (!projectId || !await verifyProjectOwnership(projectId, userId)) return res.status(404).json({ message: "Not found" });
-    const row = await storage.updateChatMessage(param(req, "id"), req.body);
+    if (!projectId || !await checkProjectPermission(req, projectId, userId, "project.chat.use")) return res.status(404).json({ message: "Not found" });
+    const { saved, hasSaveableContent } = req.body;
+    const row = await storage.updateChatMessage(param(req, "id"), { saved, hasSaveableContent });
     if (!row) return res.status(404).json({ message: "Not found" });
+    audit(req, "update", "chat_message", param(req, "id"));
     res.json(row);
   });
 
@@ -325,8 +380,8 @@ export async function registerRoutes(
 
     const { parentId, parentType, content } = parsed.data;
 
-    const projectId = await getProjectIdForChatParent(parentId, parentType);
-    if (!projectId || !await verifyProjectOwnership(projectId, userId)) {
+    const projectId = await storage.getProjectIdForParent(parentId, parentType);
+    if (!projectId || !await checkProjectPermission(req, projectId, userId, "project.chat.use")) {
       return res.status(404).json({ message: "Not found" });
     }
 
@@ -419,17 +474,29 @@ export async function registerRoutes(
   });
 
   // === ADMIN ROUTES ===
-  app.get("/api/admin/users", isAuthenticated, isAdmin, async (_req, res) => {
+  app.get("/api/admin/users", isAuthenticated, requirePermission("admin.users.manage"), async (_req, res) => {
     const allUsers = await db.select().from(users);
-    res.json(allUsers);
+
+    // Enrich with role info
+    const enriched = await Promise.all(allUsers.map(async (u) => {
+      const userRolesList = await rbacStorage.getUserRoles(u.id);
+      const systemRoles = userRolesList.filter((r) => r.type === "system");
+      return {
+        ...u,
+        systemRoles: systemRoles.map((r) => r.name),
+        primaryRole: systemRoles.find((r) => r.name !== "member")?.name || "member",
+      };
+    }));
+
+    res.json(enriched);
   });
 
-  app.get("/api/admin/projects", isAuthenticated, isAdmin, async (_req, res) => {
+  app.get("/api/admin/projects", isAuthenticated, requirePermission("admin.projects.view"), async (_req, res) => {
     const allProjects = await storage.listAllProjects();
     res.json(allProjects);
   });
 
-  app.get("/api/admin/stats", isAuthenticated, isAdmin, async (_req, res) => {
+  app.get("/api/admin/stats", isAuthenticated, requirePermission("admin.stats.view"), async (_req, res) => {
     const [userCount] = await db.select({ count: sql<number>`count(*)` }).from(users);
     const [projectCount] = await db.select({ count: sql<number>`count(*)` }).from(projects);
     res.json({
@@ -438,26 +505,53 @@ export async function registerRoutes(
     });
   });
 
-  app.patch("/api/admin/users/:id/toggle-admin", isAuthenticated, isAdmin, async (req, res) => {
-    const targetId = param(req, "id");
-    const user = await authStorage.getUser(targetId);
-    if (!user) return res.status(404).json({ message: "User not found" });
-    const [updated] = await db.update(users).set({ isAdmin: !user.isAdmin }).where(eq(users.id, targetId)).returning();
-    res.json(updated);
-  });
-
-  app.patch("/api/admin/users/:id/deactivate", isAuthenticated, isAdmin, async (req, res) => {
+  app.patch("/api/admin/users/:id/deactivate", isAuthenticated, requirePermission("admin.users.manage"), async (req, res) => {
     const targetId = param(req, "id");
     const currentUserId = getUserId(req);
     if (targetId === currentUserId) return res.status(400).json({ message: "Cannot deactivate yourself" });
     const user = await authStorage.getUser(targetId);
     if (!user) return res.status(404).json({ message: "User not found" });
     const [updated] = await db.update(users).set({ isActive: !user.isActive }).where(eq(users.id, targetId)).returning();
+    if (!updated) return res.status(404).json({ message: "User not found" });
+    audit(req, "update", "user", targetId, { isActive: !user.isActive });
     res.json(updated);
   });
 
+  // === ASSIGN SYSTEM ROLE TO USER ===
+  app.put("/api/admin/users/:id/role", isAuthenticated, requirePermission("admin.users.roles"), async (req, res) => {
+    const targetId = param(req, "id");
+    const currentUserId = getUserId(req);
+    if (targetId === currentUserId) return res.status(400).json({ message: "Cannot change your own role" });
+
+    const { roleId } = req.body;
+    if (typeof roleId !== "string") return res.status(400).json({ message: "roleId is required" });
+
+    const role = await rbacStorage.getRoleById(roleId);
+    if (!role || role.type !== "system") return res.status(400).json({ message: "Invalid system role" });
+
+    // Only super_admins can assign the super_admin role
+    if (role.name === "super_admin") {
+      const callerPerms = await rbacStorage.getUserSystemPermissions(currentUserId);
+      if (!callerPerms.includes("*")) {
+        return res.status(403).json({ message: "Only super admins can assign the super_admin role" });
+      }
+    }
+
+    const user = await authStorage.getUser(targetId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    await rbacStorage.setUserSystemRole(targetId, roleId);
+
+    // Sync isAdmin flag for backward compat
+    const isAdminRole = role.name === "admin" || role.name === "super_admin";
+    await db.update(users).set({ isAdmin: isAdminRole }).where(eq(users.id, targetId));
+
+    audit(req, "update", "user", targetId, { role: role.name });
+    res.json({ success: true, role: role.name });
+  });
+
   // === SUPABASE AUTH USERS (admin only) ===
-  app.get("/api/admin/auth-users", isAuthenticated, isAdmin, async (_req, res) => {
+  app.get("/api/admin/auth-users", isAuthenticated, requirePermission("admin.auth-users.view"), async (_req, res) => {
     const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!supabaseUrl || !serviceRoleKey) {
@@ -479,26 +573,27 @@ export async function registerRoutes(
     res.json(rows);
   });
 
-  app.get("/api/admin/core-queries", isAuthenticated, isAdmin, async (_req, res) => {
+  app.get("/api/admin/core-queries", isAuthenticated, requirePermission("admin.core-queries.manage"), async (_req, res) => {
     const rows = await storage.listCoreQueries();
     res.json(rows);
   });
 
-  app.put("/api/admin/core-queries/:locationKey", isAuthenticated, isAdmin, async (req, res) => {
+  app.put("/api/admin/core-queries/:locationKey", isAuthenticated, requirePermission("admin.core-queries.manage"), async (req, res) => {
     const locationKey = param(req, "locationKey");
     const { contextQuery } = req.body;
     if (typeof contextQuery !== "string") return res.status(400).json({ message: "contextQuery is required" });
     const row = await storage.upsertCoreQuery(locationKey, contextQuery);
+    audit(req, "update", "core_query", locationKey);
     res.json(row);
   });
 
   // === PROMPT BLOCKS (admin only) ===
-  app.get("/api/admin/prompt-blocks", isAuthenticated, isAdmin, async (_req, res) => {
+  app.get("/api/admin/prompt-blocks", isAuthenticated, requirePermission("admin.prompts.manage"), async (_req, res) => {
     const rows = await storage.listPromptBlocks();
     res.json(rows);
   });
 
-  app.get("/api/admin/prompt-blocks/:id", isAuthenticated, isAdmin, async (req, res) => {
+  app.get("/api/admin/prompt-blocks/:id", isAuthenticated, requirePermission("admin.prompts.manage"), async (req, res) => {
     const row = await storage.getPromptBlock(param(req, "id"));
     if (!row) return res.status(404).json({ message: "Not found" });
     res.json(row);
@@ -506,7 +601,7 @@ export async function registerRoutes(
 
   const validCategories = new Set<string>(PROMPT_CATEGORIES);
 
-  app.post("/api/admin/prompt-blocks", isAuthenticated, isAdmin, async (req, res) => {
+  app.post("/api/admin/prompt-blocks", isAuthenticated, requirePermission("admin.prompts.manage"), async (req, res) => {
     const { name, category, content, description, isActive, sortOrder } = req.body;
     if (typeof name !== "string" || !name.trim()) return res.status(400).json({ message: "name is required" });
     if (typeof category !== "string" || !validCategories.has(category)) {
@@ -520,10 +615,11 @@ export async function registerRoutes(
       isActive: isActive ?? true,
       sortOrder: sortOrder ?? 0,
     });
+    audit(req, "create", "prompt_block", row.id, { name: row.name });
     res.status(201).json(row);
   });
 
-  app.patch("/api/admin/prompt-blocks/:id", isAuthenticated, isAdmin, async (req, res) => {
+  app.patch("/api/admin/prompt-blocks/:id", isAuthenticated, requirePermission("admin.prompts.manage"), async (req, res) => {
     const existing = await storage.getPromptBlock(param(req, "id"));
     if (!existing) return res.status(404).json({ message: "Not found" });
 
@@ -560,29 +656,31 @@ export async function registerRoutes(
 
     const row = await storage.updatePromptBlock(param(req, "id"), update);
     if (!row) return res.status(404).json({ message: "Not found" });
+    audit(req, "update", "prompt_block", param(req, "id"));
     res.json(row);
   });
 
-  app.delete("/api/admin/prompt-blocks/:id", isAuthenticated, isAdmin, async (req, res) => {
+  app.delete("/api/admin/prompt-blocks/:id", isAuthenticated, requirePermission("admin.prompts.manage"), async (req, res) => {
     const existing = await storage.getPromptBlock(param(req, "id"));
     if (!existing) return res.status(404).json({ message: "Not found" });
     await storage.deletePromptBlock(param(req, "id"));
+    audit(req, "delete", "prompt_block", param(req, "id"));
     res.status(204).end();
   });
 
   // === PROMPT VERSIONS (admin only, read) ===
-  app.get("/api/admin/prompt-blocks/:blockId/versions", isAuthenticated, isAdmin, async (req, res) => {
+  app.get("/api/admin/prompt-blocks/:blockId/versions", isAuthenticated, requirePermission("admin.prompts.manage"), async (req, res) => {
     const rows = await storage.listPromptVersions(param(req, "blockId"));
     res.json(rows);
   });
 
   // === PROMPT LOCATIONS (admin only) ===
-  app.get("/api/admin/prompt-locations/:locationKey", isAuthenticated, isAdmin, async (req, res) => {
+  app.get("/api/admin/prompt-locations/:locationKey", isAuthenticated, requirePermission("admin.prompts.manage"), async (req, res) => {
     const rows = await storage.listPromptLocations(param(req, "locationKey"));
     res.json(rows);
   });
 
-  app.post("/api/admin/prompt-locations", isAuthenticated, isAdmin, async (req, res) => {
+  app.post("/api/admin/prompt-locations", isAuthenticated, requirePermission("admin.prompts.manage"), async (req, res) => {
     const { locationKey, blockId, sortOrder, isActive } = req.body;
     if (typeof locationKey !== "string" || !locationKey.trim()) return res.status(400).json({ message: "locationKey is required" });
     if (typeof blockId !== "string" || !blockId.trim()) return res.status(400).json({ message: "blockId is required" });
@@ -592,10 +690,11 @@ export async function registerRoutes(
       sortOrder: sortOrder ?? 0,
       isActive: isActive ?? true,
     });
+    audit(req, "create", "prompt_location", row.id);
     res.status(201).json(row);
   });
 
-  app.patch("/api/admin/prompt-locations/:id", isAuthenticated, isAdmin, async (req, res) => {
+  app.patch("/api/admin/prompt-locations/:id", isAuthenticated, requirePermission("admin.prompts.manage"), async (req, res) => {
     const { sortOrder, isActive } = req.body;
     const update: Record<string, unknown> = {};
     if (sortOrder !== undefined) update.sortOrder = sortOrder;
@@ -603,24 +702,29 @@ export async function registerRoutes(
 
     const row = await storage.updatePromptLocation(param(req, "id"), update);
     if (!row) return res.status(404).json({ message: "Not found" });
+    audit(req, "update", "prompt_location", param(req, "id"));
     res.json(row);
   });
 
-  app.delete("/api/admin/prompt-locations/:id", isAuthenticated, isAdmin, async (req, res) => {
+  app.delete("/api/admin/prompt-locations/:id", isAuthenticated, requirePermission("admin.prompts.manage"), async (req, res) => {
     await storage.deletePromptLocation(param(req, "id"));
+    audit(req, "delete", "prompt_location", param(req, "id"));
     res.status(204).end();
   });
 
-  app.put("/api/admin/prompt-locations/:locationKey/reorder", isAuthenticated, isAdmin, async (req, res) => {
+  app.put("/api/admin/prompt-locations/:locationKey/reorder", isAuthenticated, requirePermission("admin.prompts.manage"), async (req, res) => {
     const locationKey = param(req, "locationKey");
     const { ids } = req.body;
-    if (!Array.isArray(ids)) return res.status(400).json({ message: "ids array is required" });
+    if (!Array.isArray(ids) || !ids.every((id: unknown) => typeof id === "string")) {
+      return res.status(400).json({ message: "ids must be an array of strings" });
+    }
     await storage.reorderPromptLocations(locationKey, ids);
+    audit(req, "update", "prompt_locations", undefined, { action: "reorder", locationKey });
     res.status(204).end();
   });
 
   // === PROMPT PREVIEW (admin only) ===
-  app.get("/api/admin/prompt-preview/:locationKey", isAuthenticated, isAdmin, async (req, res) => {
+  app.get("/api/admin/prompt-preview/:locationKey", isAuthenticated, requirePermission("admin.prompts.manage"), async (req, res) => {
     const locationKey = param(req, "locationKey");
     const providerName = (req.query.provider as string) || "anthropic";
 
@@ -639,6 +743,145 @@ export async function registerRoutes(
       systemMessage: systemMessage?.content || "",
       provider: providerName,
       tokenEstimate: Math.ceil((systemMessage?.content || "").length / 4),
+    });
+  });
+
+  // === ROLES MANAGEMENT (admin only) ===
+  app.get("/api/admin/roles", isAuthenticated, requirePermission("admin.roles.view"), async (_req, res) => {
+    const allRoles = await rbacStorage.listRoles();
+    const enriched = await Promise.all(allRoles.map(async (role) => {
+      const perms = await rbacStorage.listRolePermissions(role.id);
+      return { ...role, permissions: perms };
+    }));
+    res.json(enriched);
+  });
+
+  app.get("/api/admin/roles/:id", isAuthenticated, requirePermission("admin.roles.view"), async (req, res) => {
+    const role = await rbacStorage.getRoleById(param(req, "id"));
+    if (!role) return res.status(404).json({ message: "Role not found" });
+    const perms = await rbacStorage.listRolePermissions(role.id);
+    res.json({ ...role, permissions: perms });
+  });
+
+  app.post("/api/admin/roles", isAuthenticated, requirePermission("admin.roles.manage"), async (req, res) => {
+    const { name, description, type } = req.body;
+    if (typeof name !== "string" || !name.trim()) return res.status(400).json({ message: "name is required" });
+    if (type !== "system" && type !== "project") return res.status(400).json({ message: "type must be 'system' or 'project'" });
+    const role = await rbacStorage.createRole({ name: name.trim(), description: description || "", type });
+    audit(req, "create", "role", role.id, { name: role.name });
+    res.status(201).json(role);
+  });
+
+  app.patch("/api/admin/roles/:id", isAuthenticated, requirePermission("admin.roles.manage"), async (req, res) => {
+    const role = await rbacStorage.getRoleById(param(req, "id"));
+    if (!role) return res.status(404).json({ message: "Role not found" });
+    if (role.isBuiltIn) return res.status(400).json({ message: "Cannot modify built-in roles" });
+    const { name, description } = req.body;
+    const updated = await rbacStorage.updateRole(param(req, "id"), {
+      ...(name !== undefined ? { name } : {}),
+      ...(description !== undefined ? { description } : {}),
+    });
+    audit(req, "update", "role", param(req, "id"));
+    res.json(updated);
+  });
+
+  app.delete("/api/admin/roles/:id", isAuthenticated, requirePermission("admin.roles.manage"), async (req, res) => {
+    const roleId = param(req, "id");
+    const role = await rbacStorage.getRoleById(roleId);
+    if (!role) return res.status(404).json({ message: "Role not found" });
+    if (role.isBuiltIn) return res.status(400).json({ message: "Cannot delete built-in roles" });
+    // Block deletion if role has active assignments (would cascade-delete them)
+    const assignmentCount = await rbacStorage.getRoleAssignmentCount(roleId);
+    if (assignmentCount > 0) {
+      return res.status(400).json({ message: `Cannot delete role with ${assignmentCount} active assignment(s). Reassign users first.` });
+    }
+    await rbacStorage.deleteRole(roleId);
+    audit(req, "delete", "role", roleId);
+    res.status(204).end();
+  });
+
+  app.put("/api/admin/roles/:id/permissions", isAuthenticated, requirePermission("admin.roles.manage"), async (req, res) => {
+    const role = await rbacStorage.getRoleById(param(req, "id"));
+    if (!role) return res.status(404).json({ message: "Role not found" });
+    if (role.isBuiltIn) return res.status(400).json({ message: "Cannot modify built-in role permissions" });
+    const { permissionIds } = req.body;
+    if (!Array.isArray(permissionIds) || !permissionIds.every((id: unknown) => typeof id === "string")) {
+      return res.status(400).json({ message: "permissionIds must be an array of strings" });
+    }
+    await rbacStorage.setRolePermissions(param(req, "id"), permissionIds);
+    audit(req, "update", "role_permissions", param(req, "id"));
+    res.json({ success: true });
+  });
+
+  app.get("/api/admin/permissions", isAuthenticated, requirePermission("admin.roles.view"), async (_req, res) => {
+    const allPerms = await rbacStorage.listPermissions();
+    res.json(allPerms);
+  });
+
+  // === AUDIT LOG (admin only) ===
+  app.get("/api/admin/audit-log", isAuthenticated, requirePermission("admin.audit.view"), async (req, res) => {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+    const offset = (page - 1) * limit;
+
+    const conditions = [];
+
+    if (req.query.actorId) {
+      conditions.push(eq(auditLog.actorId, req.query.actorId as string));
+    }
+    if (req.query.action) {
+      conditions.push(eq(auditLog.action, req.query.action as string));
+    }
+    if (req.query.resourceType) {
+      conditions.push(eq(auditLog.resourceType, req.query.resourceType as string));
+    }
+    if (req.query.startDate) {
+      const d = new Date(req.query.startDate as string);
+      if (isNaN(d.getTime())) return res.status(400).json({ message: "Invalid startDate" });
+      conditions.push(gte(auditLog.createdAt, d));
+    }
+    if (req.query.endDate) {
+      const d = new Date(req.query.endDate as string);
+      if (isNaN(d.getTime())) return res.status(400).json({ message: "Invalid endDate" });
+      conditions.push(lte(auditLog.createdAt, d));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const [countResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(auditLog)
+      .where(whereClause);
+
+    const rows = await db
+      .select()
+      .from(auditLog)
+      .where(whereClause)
+      .orderBy(desc(auditLog.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    // Enrich with actor info
+    const actorIds = Array.from(new Set(rows.filter((r) => r.actorId).map((r) => r.actorId!)));
+    const actorMap = new Map<string, { email: string | null; firstName: string | null; lastName: string | null }>();
+    for (const actorId of actorIds) {
+      const user = await authStorage.getUser(actorId);
+      if (user) {
+        actorMap.set(actorId, { email: user.email, firstName: user.firstName, lastName: user.lastName });
+      }
+    }
+
+    const enrichedRows = rows.map((row) => ({
+      ...row,
+      actor: row.actorId ? actorMap.get(row.actorId) || null : null,
+    }));
+
+    res.json({
+      entries: enrichedRows,
+      total: Number(countResult.count),
+      page,
+      limit,
+      totalPages: Math.ceil(Number(countResult.count) / limit),
     });
   });
 

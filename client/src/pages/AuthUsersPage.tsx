@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, ArrowLeft, Mail, Calendar, ShieldCheck, Smartphone } from "lucide-react";
 import { Link } from "wouter";
 import { fetchJson } from "@/lib/api";
+import { AdminShell } from "@/components/admin/AdminShell";
 
 type AuthUser = {
   id: string;
@@ -59,14 +60,15 @@ function getAvatar(u: AuthUser): string | undefined {
   return u.user_metadata.avatar_url || u.user_metadata.picture || undefined;
 }
 
-export default function AuthUsersPage() {
-  const { data: authUsers = [], isLoading } = useQuery<AuthUser[]>({
+export default function AuthUsersPage(): React.ReactElement {
+  // Permission check handled by AdminRoute in App.tsx
+  const { data: authUsers = [], isLoading, isError } = useQuery<AuthUser[]>({
     queryKey: ["/api/admin/auth-users"],
     queryFn: () => fetchJson("/api/admin/auth-users"),
   });
 
   return (
-    <div className="min-h-screen bg-background" data-testid="auth-users-page">
+    <AdminShell>
       <div className="border-b bg-background">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -98,6 +100,8 @@ export default function AuthUsersPage() {
           <CardContent>
             {isLoading ? (
               <div className="py-8 text-center text-muted-foreground text-sm">Loading...</div>
+            ) : isError ? (
+              <div className="py-8 text-center text-sm text-destructive">Failed to load auth users. Please try refreshing.</div>
             ) : (
               <div className="divide-y">
                 {authUsers.map((u) => {
@@ -172,6 +176,6 @@ export default function AuthUsersPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </AdminShell>
   );
 }

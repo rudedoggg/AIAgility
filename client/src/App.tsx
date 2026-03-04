@@ -23,12 +23,33 @@ import CoreQsPage from "@/pages/CoreQsPage";
 import StyleGuidePage from "@/pages/StyleGuidePage";
 import TrashPage from "@/pages/TrashPage";
 import AuthUsersPage from "@/pages/AuthUsersPage";
+import RolesPage from "@/pages/RolesPage";
+import AuditLogPage from "@/pages/AuditLogPage";
 import NotFound from "@/pages/not-found";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import { PromptDialogProvider } from "@/components/shared/PromptDialogProvider";
 import { Loader2 } from "lucide-react";
 
-function AuthenticatedRouter() {
+function AdminRoute({ component: Component, permission }: { component: React.ComponentType; permission: string }): React.ReactElement {
+  const { hasPermission, isLoading } = useAuth();
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+  if (!hasPermission(permission)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <p className="text-muted-foreground text-lg">Access denied.</p>
+      </div>
+    );
+  }
+  return <Component />;
+}
+
+function AuthenticatedRouter(): React.ReactElement {
   return (
     <Switch>
       <Route path="/" component={BriefPage} />
@@ -48,17 +69,19 @@ function AuthenticatedRouter() {
       <Route path="/account" component={AccountPage} />
       <Route path="/account/security" component={SecurityPage} />
 
-      <Route path="/admin" component={AdminPage} />
-      <Route path="/admin/auth-users" component={AuthUsersPage} />
-      <Route path="/admin/coreqs" component={CoreQsPage} />
-      <Route path="/admin/style-guide" component={StyleGuidePage} />
+      <Route path="/admin">{() => <AdminRoute component={AdminPage} permission="admin.users.manage" />}</Route>
+      <Route path="/admin/auth-users">{() => <AdminRoute component={AuthUsersPage} permission="admin.auth-users.view" />}</Route>
+      <Route path="/admin/coreqs">{() => <AdminRoute component={CoreQsPage} permission="admin.prompts.manage" />}</Route>
+      <Route path="/admin/style-guide">{() => <AdminRoute component={StyleGuidePage} permission="admin.*" />}</Route>
+      <Route path="/admin/roles">{() => <AdminRoute component={RolesPage} permission="admin.roles.view" />}</Route>
+      <Route path="/admin/audit">{() => <AdminRoute component={AuditLogPage} permission="admin.audit.view" />}</Route>
 
       <Route component={NotFound} />
     </Switch>
   );
 }
 
-function AppContent() {
+function AppContent(): React.ReactElement {
   const { isLoading, isAuthenticated } = useAuth();
   const isPasswordRecovery = sessionStorage.getItem("passwordRecovery") === "true";
 
@@ -86,7 +109,7 @@ function AppContent() {
   return <AuthenticatedRouter />;
 }
 
-function App() {
+function App(): React.ReactElement {
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>

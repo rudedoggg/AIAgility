@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { ChevronDown, FolderPlus, LogOut, Settings, User, Shield, MessageSquare, Sun, Moon, Palette, Trash2 } from "lucide-react";
+import { ChevronDown, FolderPlus, LogOut, Settings, User, Shield, MessageSquare, Sun, Moon, Palette, Trash2, ScrollText } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -22,7 +22,13 @@ import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { usePromptDialog } from "@/components/shared/PromptDialogProvider";
 
-function generateTemplateFromSnippet(projectName: string, snippet: string) {
+function generateTemplateFromSnippet(projectName: string, snippet: string): {
+  executiveSummary: string;
+  dashboardStatus: { status: string; done: string[]; undone: string[]; nextSteps: string[] };
+  brief: Array<{ genericName: string; subtitle: string; completeness: number; totalItems: number; completedItems: number; content: string; sortOrder: number; items: Array<{ type: string; title: string; preview: string; date: string }> }>;
+  discovery: Array<{ name: string; sortOrder: number; items: Array<{ type: string; title: string; preview: string; date: string }> }>;
+  deliverables: Array<{ title: string; subtitle: string; completeness: number; status: string; content: string; engaged: boolean; sortOrder: number; items: Array<{ type: string; title: string; preview: string; date: string }> }>;
+} {
   const cleaned = snippet.replace(/\s+/g, " ").trim();
   const focus = cleaned.split(/[.?!]/)[0]?.slice(0, 140) || cleaned.slice(0, 140);
 
@@ -113,10 +119,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-export function Header() {
+export function Header(): React.ReactElement {
   const [location, setLocation] = useLocation();
   const [projectName, setProjectName] = useState(getSelectedProject().name);
-  const { user, logout } = useAuth();
+  const { user, logout, hasPermission } = useAuth();
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
   const { prompt } = usePromptDialog();
@@ -264,7 +270,7 @@ export function Header() {
   ];
 
   return (
-    <header className="h-[60px] border-b bg-white flex items-center justify-between px-6 fixed top-0 w-full z-50">
+    <header className="h-[60px] border-b bg-background flex items-center justify-between px-6 fixed top-0 w-full z-50">
       <div className="flex items-center gap-3 font-bold text-lg tracking-tight font-heading">
         <div className="w-8 h-8 bg-primary rounded-md flex items-center justify-center text-primary-foreground" data-testid="img-app-mark">
           A
@@ -425,7 +431,7 @@ export function Header() {
             </DropdownMenuItem>
             <DropdownMenuItem data-testid="menu-user-account" onSelect={() => setLocation("/account")}>Account</DropdownMenuItem>
             <DropdownMenuItem data-testid="menu-user-security" onSelect={() => setLocation("/account/security")}>Security</DropdownMenuItem>
-            {user?.isAdmin && (
+            {hasPermission("admin.*") && (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem data-testid="menu-user-admin" onSelect={() => setLocation("/admin")}>
@@ -439,6 +445,14 @@ export function Header() {
                 <DropdownMenuItem data-testid="menu-user-styleguide" onSelect={() => setLocation("/admin/style-guide")}>
                   <Palette className="w-4 h-4 mr-2" />
                   Style Guide
+                </DropdownMenuItem>
+                <DropdownMenuItem data-testid="menu-user-roles" onSelect={() => setLocation("/admin/roles")}>
+                  <Shield className="w-4 h-4 mr-2" />
+                  Roles
+                </DropdownMenuItem>
+                <DropdownMenuItem data-testid="menu-user-audit" onSelect={() => setLocation("/admin/audit")}>
+                  <ScrollText className="w-4 h-4 mr-2" />
+                  Audit Log
                 </DropdownMenuItem>
               </>
             )}

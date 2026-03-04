@@ -1,11 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { User } from "@shared/models/auth";
 import { supabase } from "@/lib/supabase";
 import type { Session } from "@supabase/supabase-js";
 import { API_BASE_URL } from "@/lib/config";
 
-async function fetchAppUser(): Promise<User | null> {
+type UserWithPermissions = User & {
+  systemPermissions?: string[];
+  systemRoles?: string[];
+};
+
+async function fetchAppUser(): Promise<UserWithPermissions | null> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   if (!token) return null;
@@ -46,7 +51,25 @@ async function syncUser(): Promise<void> {
   }
 }
 
-export function useAuth() {
+/** Check if a permission key matches the user's granted permissions (supports wildcards). */
+function permissionMatches(required: string, granted: string[]): boolean {
+  if (granted.includes("*")) return true;
+  if (granted.includes(required)) return true;
+  const parts = required.split(".");
+  for (let i = 1; i < parts.length; i++) {
+    const wildcard = parts.slice(0, i).join(".") + ".*";
+    if (granted.includes(wildcard)) return true;
+  }
+  return false;
+}
+
+export function useAuth(): {
+  user: UserWithPermissions | null;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+  logout: () => Promise<void>;
+  hasPermission: (key: string) => boolean;
+} {
   const queryClient = useQueryClient();
   const [session, setSession] = useState<Session | null>(null);
   const [isSessionLoading, setIsSessionLoading] = useState(true);
@@ -102,7 +125,7 @@ export function useAuth() {
     };
   }, [queryClient]);
 
-  const { data: user, isLoading: isUserLoading } = useQuery<User | null>({
+  const { data: user, isLoading: isUserQueryLoading } = useQuery<UserWithPermissions | null>({
     queryKey: ["/api/auth/user"],
     queryFn: fetchAppUser,
     retry: false,
@@ -112,6 +135,12 @@ export function useAuth() {
     refetchOnMount: "always",
     enabled: !!session,
   });
+
+  const hasPermission = useCallback((key: string): boolean => {
+    if (!user) return false;
+    const perms = user.systemPermissions || [];
+    return permissionMatches(key, perms);
+  }, [user]);
 
   const logout = async (): Promise<void> => {
     try {
@@ -127,8 +156,9 @@ export function useAuth() {
 
   return {
     user: user ?? null,
-    isLoading: isSessionLoading,
+    isLoading: isSessionLoading || (!!session && isUserQueryLoading),
     isAuthenticated: !!session,
     logout,
+    hasPermission,
   };
 }

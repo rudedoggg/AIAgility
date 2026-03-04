@@ -165,6 +165,42 @@ export const api = {
     get: (locationKey: string, provider?: string) =>
       fetchJson<ApiPromptPreview>(`/api/admin/prompt-preview/${locationKey}${provider ? `?provider=${provider}` : ""}`),
   },
+
+  roles: {
+    list: () => fetchJson<ApiRoleWithPermissions[]>("/api/admin/roles"),
+    get: (id: string) => fetchJson<ApiRoleWithPermissions>(`/api/admin/roles/${id}`),
+    create: (data: { name: string; description: string; type: string }) =>
+      apiRequest("POST", "/api/admin/roles", data).then(json<ApiRole>),
+    update: (id: string, data: { name?: string; description?: string }) =>
+      apiRequest("PATCH", `/api/admin/roles/${id}`, data).then(json<ApiRole>),
+    delete: (id: string) => apiRequest("DELETE", `/api/admin/roles/${id}`),
+    setPermissions: (id: string, permissionIds: string[]) =>
+      apiRequest("PUT", `/api/admin/roles/${id}/permissions`, { permissionIds }),
+  },
+
+  permissions: {
+    list: () => fetchJson<ApiPermission[]>("/api/admin/permissions"),
+  },
+
+  userRoles: {
+    assign: (userId: string, roleId: string) =>
+      apiRequest("PUT", `/api/admin/users/${userId}/role`, { roleId }).then(json<{ success: boolean; role: string }>),
+  },
+
+  auditLog: {
+    list: (params?: { page?: number; limit?: number; actorId?: string; action?: string; resourceType?: string; startDate?: string; endDate?: string }) => {
+      const query = new URLSearchParams();
+      if (params?.page) query.set("page", String(params.page));
+      if (params?.limit) query.set("limit", String(params.limit));
+      if (params?.actorId) query.set("actorId", params.actorId);
+      if (params?.action) query.set("action", params.action);
+      if (params?.resourceType) query.set("resourceType", params.resourceType);
+      if (params?.startDate) query.set("startDate", params.startDate);
+      if (params?.endDate) query.set("endDate", params.endDate);
+      const qs = query.toString();
+      return fetchJson<ApiAuditLogPage>(`/api/admin/audit-log${qs ? `?${qs}` : ""}`);
+    },
+  },
 };
 
 export type ApiCoreQuery = {
@@ -208,4 +244,60 @@ export type ApiPromptPreview = {
   systemMessage: string;
   provider: string;
   tokenEstimate: number;
+};
+
+// === RBAC Types ===
+export type ApiRole = {
+  id: string;
+  name: string;
+  description: string;
+  type: string;
+  isBuiltIn: boolean;
+  isDefault: boolean;
+  createdAt: string;
+};
+
+export type ApiPermission = {
+  id: string;
+  key: string;
+  description: string;
+  category: string;
+};
+
+export type ApiRoleWithPermissions = ApiRole & {
+  permissions: ApiPermission[];
+};
+
+export type ApiUserWithRoles = {
+  id: string;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  profileImageUrl: string | null;
+  isAdmin: boolean;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  systemRoles: string[];
+  primaryRole: string;
+};
+
+export type ApiAuditLogEntry = {
+  id: string;
+  actorId: string | null;
+  action: string;
+  resourceType: string;
+  resourceId: string | null;
+  changes: Record<string, unknown> | null;
+  ip: string | null;
+  createdAt: string;
+  actor: { email: string | null; firstName: string | null; lastName: string | null } | null;
+};
+
+export type ApiAuditLogPage = {
+  entries: ApiAuditLogEntry[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 };

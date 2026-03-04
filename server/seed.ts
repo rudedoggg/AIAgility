@@ -1,4 +1,5 @@
 import { storage } from "./storage";
+import { rbacStorage } from "./auth/rbac-storage";
 
 function executiveSummaryFor(name: string) {
   return `# Executive Summary — ${name}
@@ -149,6 +150,16 @@ export async function seedDemoData(userId?: string) {
     { role: "user", content: "Help me structure this project so we can move faster with fewer blind spots.", timestamp: "10:01 AM", hasSaveableContent: false, saved: false, sortOrder: 1 },
     { role: "ai", content: "Got it. I'll help define the brief, collect research, and produce deliverables. When I suggest content, you can save it to a specific section, category, or asset.", timestamp: "10:02 AM", hasSaveableContent: true, saved: false, sortOrder: 2 },
   ];
+
+  // Create owner project_members entries for RBAC
+  if (userId) {
+    const ownerRole = await rbacStorage.getRoleByName("owner");
+    if (ownerRole) {
+      for (const pid of [p1.id, p2.id, p3.id]) {
+        await rbacStorage.addProjectMember(pid, userId, ownerRole.id);
+      }
+    }
+  }
 
   for (const pid of [p1.id, p2.id, p3.id]) {
     for (const pageType of ["brief_page", "discovery_page", "deliverable_page"]) {
