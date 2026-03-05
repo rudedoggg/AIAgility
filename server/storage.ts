@@ -84,7 +84,7 @@ export interface IStorage {
   listPromptLocations(locationKey: string): Promise<PromptLocation[]>;
   createPromptLocation(data: InsertPromptLocation): Promise<PromptLocation>;
   updatePromptLocation(id: string, data: Partial<InsertPromptLocation>): Promise<PromptLocation | undefined>;
-  deletePromptLocation(id: string): Promise<void>;
+  deletePromptLocation(id: string): Promise<boolean>;
   reorderPromptLocations(locationKey: string, ids: string[]): Promise<void>;
 }
 
@@ -419,8 +419,9 @@ export class DatabaseStorage implements IStorage {
     return row;
   }
 
-  async deletePromptLocation(id: string): Promise<void> {
-    await db.delete(promptLocations).where(eq(promptLocations.id, id));
+  async deletePromptLocation(id: string): Promise<boolean> {
+    const rows = await db.delete(promptLocations).where(eq(promptLocations.id, id)).returning();
+    return rows.length > 0;
   }
 
   async reorderPromptLocations(locationKey: string, ids: string[]): Promise<void> {

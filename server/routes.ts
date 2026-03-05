@@ -7,7 +7,7 @@ import { isAuthenticated, authStorage, requirePermission, checkProjectPermission
 import { audit } from "./auth/audit";
 import { db } from "./db";
 import { users, projects, auditLog } from "@shared/schema";
-import { eq, sql, desc, and, gte, lte } from "drizzle-orm";
+import { eq, sql, desc, and, gte, lte, inArray } from "drizzle-orm";
 import { getAIProvider, type AIMessage } from "./ai";
 import { assemblePrompt, PROMPT_CATEGORIES } from "./prompts";
 import { createClient } from "@supabase/supabase-js";
@@ -546,6 +546,21 @@ export async function registerRoutes(
     const user = await authStorage.getUser(targetId);
     if (!user) return res.status(404).json({ message: "User not found" });
 
+    // Prevent demoting the last super_admin
+    if (role.name !== "super_admin") {
+      const targetRoles = await rbacStorage.getUserRoles(targetId);
+      const isSuperAdmin = targetRoles.some((r) => r.name === "super_admin");
+      if (isSuperAdmin) {
+        const superAdminRole = await rbacStorage.getRoleByName("super_admin");
+        if (superAdminRole) {
+          const count = await rbacStorage.getRoleAssignmentCount(superAdminRole.id);
+          if (count <= 1) {
+            return res.status(400).json({ message: "Cannot demote the last super admin" });
+          }
+        }
+      }
+    }
+
     await rbacStorage.setUserSystemRole(targetId, roleId);
 
     // Sync isAdmin flag for backward compat
@@ -713,7 +728,8 @@ export async function registerRoutes(
   });
 
   app.delete("/api/admin/prompt-locations/:id", isAuthenticated, requirePermission("admin.prompts.manage"), async (req, res) => {
-    await storage.deletePromptLocation(param(req, "id"));
+    const deleted = await storage.deletePromptLocation(param(req, "id"));
+    if (!deleted) return res.status(404).json({ message: "Not found" });
     audit(req, "delete", "prompt_location", param(req, "id"));
     res.status(204).end();
   });
@@ -773,6 +789,8 @@ export async function registerRoutes(
     const { name, description, type } = req.body;
     if (typeof name !== "string" || !name.trim()) return res.status(400).json({ message: "name is required" });
     if (type !== "system" && type !== "project") return res.status(400).json({ message: "type must be 'system' or 'project'" });
+    const existing = await rbacStorage.getRoleByName(name.trim());
+    if (existing) return res.status(409).json({ message: "A role with that name already exists" });
     const role = await rbacStorage.createRole({ name: name.trim(), description: description || "", type });
     audit(req, "create", "role", role.id, { name: role.name });
     res.status(201).json(role);
@@ -867,13 +885,13 @@ export async function registerRoutes(
       .limit(limit)
       .offset(offset);
 
-    // Enrich with actor info
+    // Enrich with actor info (batch query)
     const actorIds = Array.from(new Set(rows.filter((r) => r.actorId).map((r) => r.actorId!)));
     const actorMap = new Map<string, { email: string | null; firstName: string | null; lastName: string | null }>();
-    for (const actorId of actorIds) {
-      const user = await authStorage.getUser(actorId);
-      if (user) {
-        actorMap.set(actorId, { email: user.email, firstName: user.firstName, lastName: user.lastName });
+    if (actorIds.length > 0) {
+      const actorRows = await db.select().from(users).where(inArray(users.id, actorIds));
+      for (const u of actorRows) {
+        actorMap.set(u.id, { email: u.email, firstName: u.firstName, lastName: u.lastName });
       }
     }
 
