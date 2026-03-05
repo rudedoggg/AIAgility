@@ -163,9 +163,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async reorderBriefSections(projectId: string, ids: string[]): Promise<void> {
-    for (let i = 0; i < ids.length; i++) {
-      await db.update(briefSections).set({ sortOrder: i }).where(and(eq(briefSections.id, ids[i]), eq(briefSections.projectId, projectId)));
-    }
+    await db.transaction(async (tx) => {
+      for (let i = 0; i < ids.length; i++) {
+        await tx.update(briefSections).set({ sortOrder: i }).where(and(eq(briefSections.id, ids[i]), eq(briefSections.projectId, projectId)));
+      }
+    });
   }
 
   async listDiscoveryCategories(projectId: string): Promise<DiscoveryCategory[]> {
@@ -192,9 +194,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async reorderDiscoveryCategories(projectId: string, ids: string[]): Promise<void> {
-    for (let i = 0; i < ids.length; i++) {
-      await db.update(discoveryCategories).set({ sortOrder: i }).where(and(eq(discoveryCategories.id, ids[i]), eq(discoveryCategories.projectId, projectId)));
-    }
+    await db.transaction(async (tx) => {
+      for (let i = 0; i < ids.length; i++) {
+        await tx.update(discoveryCategories).set({ sortOrder: i }).where(and(eq(discoveryCategories.id, ids[i]), eq(discoveryCategories.projectId, projectId)));
+      }
+    });
   }
 
   async listDeliverables(projectId: string): Promise<Deliverable[]> {
@@ -221,9 +225,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async reorderDeliverables(projectId: string, ids: string[]): Promise<void> {
-    for (let i = 0; i < ids.length; i++) {
-      await db.update(deliverables).set({ sortOrder: i }).where(and(eq(deliverables.id, ids[i]), eq(deliverables.projectId, projectId)));
-    }
+    await db.transaction(async (tx) => {
+      for (let i = 0; i < ids.length; i++) {
+        await tx.update(deliverables).set({ sortOrder: i }).where(and(eq(deliverables.id, ids[i]), eq(deliverables.projectId, projectId)));
+      }
+    });
   }
 
   async listBucketItems(parentId: string, parentType: string): Promise<BucketItem[]> {
@@ -418,11 +424,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async reorderPromptLocations(locationKey: string, ids: string[]): Promise<void> {
-    for (let i = 0; i < ids.length; i++) {
-      await db.update(promptLocations)
-        .set({ sortOrder: i })
-        .where(and(eq(promptLocations.id, ids[i]), eq(promptLocations.locationKey, locationKey)));
-    }
+    await db.transaction(async (tx) => {
+      for (let i = 0; i < ids.length; i++) {
+        await tx.update(promptLocations)
+          .set({ sortOrder: i })
+          .where(and(eq(promptLocations.id, ids[i]), eq(promptLocations.locationKey, locationKey)));
+      }
+    });
   }
 }
 
