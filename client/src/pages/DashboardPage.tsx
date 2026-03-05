@@ -103,17 +103,17 @@ export default function DashboardPage() {
       <div className="flex-1 pt-[60px] h-full overflow-hidden w-full">
         <div className="h-full w-full p-2">
           <ResizablePanelGroup direction="horizontal" className="h-full w-full gap-2">
-            <ResizablePanel defaultSize={60} minSize={40}>
-              <div className="h-full flex flex-col gap-2">
-                <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden shrink-0">
-                  <div className="p-4 border-b">
-                    <div className="text-xs uppercase tracking-wider text-muted-foreground" data-testid="text-dashboard-label">
-                      Dashboard
-                    </div>
-                    <div className="text-xl font-bold font-heading truncate" data-testid="text-dashboard-project-title">
-                      {activeProject?.name || "Project"}
-                    </div>
+            <ResizablePanel defaultSize={35} minSize={25}>
+              <div className="h-full flex flex-col bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
+                <div className="p-4 border-b shrink-0">
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground" data-testid="text-dashboard-label">
+                    Dashboard
                   </div>
+                  <div className="text-xl font-bold font-heading truncate" data-testid="text-dashboard-project-title">
+                    {activeProject?.name || "Project"}
+                  </div>
+                </div>
+                <div className="flex-1 min-h-0 overflow-y-auto">
                   <SummaryCard
                     title="Project Status"
                     status={dashboardStatus?.status || "No status available."}
@@ -122,8 +122,23 @@ export default function DashboardPage() {
                     nextSteps={dashboardStatus?.nextSteps || []}
                   />
                 </div>
+              </div>
+            </ResizablePanel>
 
-                <div className="flex-1 min-h-0 bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
+            <ResizableHandle className="bg-transparent hover:bg-border/50 transition-colors w-[3px]" />
+
+            <ResizablePanel defaultSize={65} minSize={40}>
+              <div className="h-full flex flex-col gap-2">
+                <div className="flex-1 bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden flex flex-col min-h-0">
+                  <ChatWorkspace
+                    messages={displayMessages}
+                    onSendMessage={handleSendMessage}
+                    isStreaming={isStreaming}
+                    className="flex-1 min-h-0"
+                  />
+                </div>
+                
+                <div className="flex-1 bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden flex flex-col min-h-0">
                   <ScrollArea className="h-full">
                     <div className="p-5">
                       <div className="flex items-center justify-between gap-3 mb-4">
@@ -167,19 +182,6 @@ export default function DashboardPage() {
                     </div>
                   </ScrollArea>
                 </div>
-              </div>
-            </ResizablePanel>
-
-            <ResizableHandle className="bg-transparent hover:bg-border/50 transition-colors w-[3px]" />
-
-            <ResizablePanel defaultSize={40} minSize={25}>
-              <div className="h-full bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden flex flex-col">
-                <ChatWorkspace
-                  messages={displayMessages}
-                  onSendMessage={handleSendMessage}
-                  isStreaming={isStreaming}
-                  className="flex-1 min-h-0"
-                />
               </div>
             </ResizablePanel>
           </ResizablePanelGroup>
