@@ -206,11 +206,12 @@ function LocationTab({
       ["/api/admin/prompt-locations", locationKey],
       reordered
     );
-    api.promptLocations.reorder(locationKey, reordered.map((a) => a.id)).catch(() => {
+    api.promptLocations.reorder(locationKey, reordered.map((a) => a.id)).then(() => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/prompt-preview", locationKey] });
+    }).catch(() => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/prompt-locations", locationKey] });
       toast({ title: "Error", description: "Failed to reorder. Reverting.", variant: "destructive" });
     });
-    queryClient.invalidateQueries({ queryKey: ["/api/admin/prompt-preview", locationKey] });
   }
 
   return (
