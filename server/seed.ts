@@ -146,9 +146,9 @@ export async function seedDemoData(userId?: string) {
   await storage.createBucketItem({ parentId: p3D1.id, parentType: "deliverable", type: "note", title: "Narrative beats", preview: "Key story points", date: "Feb 12", sortOrder: 0 });
 
   const baseMessages = [
-    { role: "ai", content: "I'm ready. What's the decision or outcome you're driving toward?", timestamp: "10:00 AM", hasSaveableContent: false, saved: false, sortOrder: 0 },
-    { role: "user", content: "Help me structure this project so we can move faster with fewer blind spots.", timestamp: "10:01 AM", hasSaveableContent: false, saved: false, sortOrder: 1 },
-    { role: "ai", content: "Got it. I'll help define the brief, collect research, and produce deliverables. When I suggest content, you can save it to a specific section, category, or asset.", timestamp: "10:02 AM", hasSaveableContent: true, saved: false, sortOrder: 2 },
+    { role: "ai", content: "I'm ready. What's the decision or outcome you're driving toward?", hasSaveableContent: false, saved: false, sortOrder: 0 },
+    { role: "user", content: "Help me structure this project so we can move faster with fewer blind spots.", hasSaveableContent: false, saved: false, sortOrder: 1 },
+    { role: "ai", content: "Got it. I'll help define the brief, collect research, and produce deliverables. When I suggest content, you can save it to a specific section, category, or asset.", hasSaveableContent: true, saved: false, sortOrder: 2 },
   ];
 
   // Create owner project_members entries for RBAC

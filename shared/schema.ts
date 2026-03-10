@@ -6,9 +6,11 @@ import { z } from "zod";
 export * from "./models/auth";
 export * from "./models/rbac";
 
+import { users } from "./models/auth";
+
 export const projects = pgTable("projects", {
   id: varchar("id", { length: 64 }).primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id", { length: 255 }),
+  userId: varchar("user_id", { length: 255 }).references(() => users.id),
   name: text("name").notNull(),
   summary: text("summary").notNull().default(""),
   executiveSummary: text("executive_summary").notNull().default(""),
@@ -73,7 +75,7 @@ export const chatMessages = pgTable("chat_messages", {
   parentType: text("parent_type").notNull(),
   role: text("role").notNull(),
   content: text("content").notNull(),
-  timestamp: text("timestamp").notNull(),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
   hasSaveableContent: boolean("has_saveable_content").notNull().default(false),
   saved: boolean("saved").notNull().default(false),
   sortOrder: integer("sort_order").notNull().default(0),
@@ -91,7 +93,7 @@ export const insertBriefSectionSchema = createInsertSchema(briefSections).omit({
 export const insertDiscoveryCategorySchema = createInsertSchema(discoveryCategories).omit({ id: true });
 export const insertDeliverableSchema = createInsertSchema(deliverables).omit({ id: true });
 export const insertBucketItemSchema = createInsertSchema(bucketItems).omit({ id: true });
-export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({ id: true });
+export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({ id: true, timestamp: true });
 
 export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type Project = typeof projects.$inferSelect;

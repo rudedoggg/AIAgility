@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Message } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, formatTimestamp } from "@/lib/utils";
 import { motion } from "framer-motion";
 import {
   Tooltip,
@@ -88,7 +88,7 @@ export function ChatWorkspace({ messages, onSendMessage, onSaveContent, saveDest
                      {/* Metadata & Actions - Inline Right */}
                      <div className="flex items-center gap-2 shrink-0">
                         <span className="text-[10px] text-muted-foreground font-mono">
-                            {msg.timestamp}
+                            {formatTimestamp(msg.timestamp)}
                         </span>
                         
                         {msg.hasSaveableContent && !msg.saved && (
