@@ -50,6 +50,13 @@ export async function registerRoutes(
       lastName: lastName || null,
       profileImageUrl: profileImageUrl || null,
     });
+
+    // Seed demo data for new users with no projects
+    const existingProjects = await storage.listProjects(userId);
+    if (existingProjects.length === 0) {
+      await seedDemoData(userId);
+    }
+
     audit(req, "sync", "user", userId);
     res.json(user);
   });
@@ -75,12 +82,7 @@ export async function registerRoutes(
   // === PROJECTS ===
   app.get("/api/projects", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
-    // Get owned projects
-    let rows = await storage.listProjects(userId);
-    if (rows.length === 0) {
-      await seedDemoData(userId);
-      rows = await storage.listProjects(userId);
-    }
+    const rows = await storage.listProjects(userId);
 
     // Also include projects where user is a member but not owner (batch query)
     const memberProjectIds = await rbacStorage.getProjectsForUser(userId);
