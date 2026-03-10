@@ -12,6 +12,38 @@ import { getAIProvider, type AIMessage } from "./ai";
 import { assemblePrompt, PROMPT_CATEGORIES } from "./prompts";
 import { createClient } from "@supabase/supabase-js";
 
+/** Simple per-user rate limiter for expensive endpoints (e.g. AI chat). */
+function rateLimit(maxRequests: number, windowMs: number): RequestHandler {
+  const hits = new Map<string, { count: number; resetAt: number }>();
+  // Clean up stale entries every 60s
+  setInterval(() => {
+    const now = Date.now();
+    hits.forEach((entry, key) => {
+      if (now > entry.resetAt) hits.delete(key);
+    });
+  }, 60_000);
+
+  return (req, res, next) => {
+    const key = req.userId || req.ip || "anonymous";
+    const now = Date.now();
+    const entry = hits.get(key);
+
+    if (!entry || now > entry.resetAt) {
+      hits.set(key, { count: 1, resetAt: now + windowMs });
+      return next();
+    }
+
+    if (entry.count >= maxRequests) {
+      const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
+      res.set("Retry-After", String(retryAfter));
+      return res.status(429).json({ message: "Too many requests. Please wait before sending another message." });
+    }
+
+    entry.count++;
+    next();
+  };
+}
+
 const syncUserSchema = z.object({
   email: z.string().email().nullable(),
   firstName: z.string().max(255).nullable(),
@@ -374,7 +406,7 @@ export async function registerRoutes(
     content: z.string().min(1).max(50000),
   });
 
-  app.post("/api/chat", isAuthenticated, async (req: Request, res: Response) => {
+  app.post("/api/chat", isAuthenticated, rateLimit(10, 60_000), async (req: Request, res: Response) => {
     const userId = getUserId(req);
     const parsed = chatRequestSchema.safeParse(req.body);
     if (!parsed.success) {
