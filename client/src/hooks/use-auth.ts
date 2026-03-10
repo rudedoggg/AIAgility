@@ -24,31 +24,26 @@ async function fetchAppUser(): Promise<UserWithPermissions | null> {
   return res.json();
 }
 
-async function syncUser(): Promise<void> {
-  const { data } = await supabase.auth.getSession();
-  const session = data.session;
-  if (!session) return;
-
+/** Fire-and-forget sync — accepts the session directly to avoid an extra getSession() round-trip. */
+function syncUser(session: Session): void {
   const supabaseUser = session.user;
   const meta = supabaseUser.user_metadata || {};
 
-  try {
-    await fetch(`${API_BASE_URL}/api/auth/sync`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        email: supabaseUser.email || null,
-        firstName: meta.first_name || meta.full_name?.split(" ")[0] || null,
-        lastName: meta.last_name || meta.full_name?.split(" ").slice(1).join(" ") || null,
-        profileImageUrl: meta.avatar_url || meta.picture || null,
-      }),
-    });
-  } catch {
+  fetch(`${API_BASE_URL}/api/auth/sync`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email: supabaseUser.email || null,
+      firstName: meta.first_name || meta.full_name?.split(" ")[0] || null,
+      lastName: meta.last_name || meta.full_name?.split(" ").slice(1).join(" ") || null,
+      profileImageUrl: meta.avatar_url || meta.picture || null,
+    }),
+  }).catch(() => {
     // Sync failure is non-critical; user is still authenticated
-  }
+  });
 }
 
 /** Check if a permission key matches the user's granted permissions (supports wildcards). */
@@ -82,17 +77,16 @@ export function useAuth(): {
         settled = true;
         setIsSessionLoading(false);
       }
-    }, 5000);
+    }, 3000);
 
-    supabase.auth.getSession().then(async ({ data }) => {
+    supabase.auth.getSession().then(({ data }) => {
       if (!settled) {
         settled = true;
         setSession(data.session);
         setIsSessionLoading(false);
       }
       if (data.session) {
-        await syncUser();
-        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        syncUser(data.session);
       }
     }).catch(() => {
       if (!settled) {
@@ -102,15 +96,14 @@ export function useAuth(): {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, newSession) => {
+      (event, newSession) => {
         setSession(newSession);
 
         if (event === "PASSWORD_RECOVERY") {
           sessionStorage.setItem("passwordRecovery", "true");
         }
-        if (event === "SIGNED_IN") {
-          await syncUser();
-          queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        if (event === "SIGNED_IN" && newSession) {
+          syncUser(newSession);
         }
         if (event === "SIGNED_OUT") {
           queryClient.setQueryData(["/api/auth/user"], null);
