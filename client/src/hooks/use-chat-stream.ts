@@ -37,7 +37,7 @@ export function useChatStream({
         id: streamId,
         role: "ai",
         content: "",
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        timestamp: new Date().toISOString(),
         isStreaming: true,
       });
 
@@ -90,7 +90,7 @@ export function useChatStream({
                   id: streamId,
                   role: "ai",
                   content: accumulated,
-                  timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                  timestamp: new Date().toISOString(),
                   isStreaming: true,
                 });
               } else if (event.type === "done") {
@@ -105,7 +105,7 @@ export function useChatStream({
                   id: streamId,
                   role: "ai",
                   content: `Sorry, I encountered an error: ${event.message}`,
-                  timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                  timestamp: new Date().toISOString(),
                   isStreaming: false,
                 });
                 setIsStreaming(false);
@@ -121,7 +121,7 @@ export function useChatStream({
           id: `error-${Date.now()}`,
           role: "ai",
           content: "Sorry, something went wrong. Please try again.",
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          timestamp: new Date().toISOString(),
           isStreaming: false,
         });
       } finally {

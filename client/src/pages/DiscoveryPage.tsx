@@ -77,7 +77,7 @@ function DiscoveryCategoryChat({ categoryId }: { categoryId: string }) {
   }, [messages, streamingMessage]);
 
   const handleSend = (content: string) => {
-    const timestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const timestamp = new Date().toISOString();
     setMessages(prev => [...prev, {
       id: `local-${Date.now()}`,
       role: "user" as const,
@@ -352,7 +352,7 @@ export default function DiscoveryPage() {
             <ChatWorkspace
                 messages={displayMessages}
                 onSendMessage={(content) => {
-                  const timestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+                  const timestamp = new Date().toISOString();
                   setMessages(prev => [...prev, {
                     id: `local-${Date.now()}`,
                     role: "user" as const,

@@ -344,10 +344,10 @@ export async function registerRoutes(
 
   app.post("/api/messages", isAuthenticated, async (req, res) => {
     const userId = getUserId(req);
-    const { parentId, parentType, content, timestamp, hasSaveableContent, saved, sortOrder } = req.body;
+    const { parentId, parentType, content, hasSaveableContent, saved, sortOrder } = req.body;
     const projectId = await storage.getProjectIdForParent(parentId, parentType);
     if (!projectId || !await checkProjectPermission(req, projectId, userId, "project.chat.use")) return res.status(404).json({ message: "Not found" });
-    const row = await storage.createChatMessage({ parentId, parentType, role: "user", content, timestamp, hasSaveableContent, saved, sortOrder });
+    const row = await storage.createChatMessage({ parentId, parentType, role: "user", content, hasSaveableContent, saved, sortOrder });
     audit(req, "create", "chat_message", row.id);
     res.status(201).json(row);
   });
@@ -387,13 +387,11 @@ export async function registerRoutes(
     }
 
     // Save user message
-    const timestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     const userMessage = await storage.createChatMessage({
       parentId,
       parentType,
       role: "user",
       content,
-      timestamp,
       hasSaveableContent: false,
       saved: false,
     });
@@ -437,13 +435,11 @@ export async function registerRoutes(
       }
 
       // Save completed AI response
-      const aiTimestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
       const aiMessage = await storage.createChatMessage({
         parentId,
         parentType,
         role: "ai",
         content: fullResponse,
-        timestamp: aiTimestamp,
         hasSaveableContent: true,
         saved: false,
       });
@@ -459,13 +455,11 @@ export async function registerRoutes(
 
       // Save safe error as AI message — wrapped so a storage failure can't prevent SSE cleanup
       try {
-        const errTimestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
         await storage.createChatMessage({
           parentId,
           parentType,
           role: "ai",
           content: safeErrorText,
-          timestamp: errTimestamp,
           hasSaveableContent: false,
           saved: false,
         });

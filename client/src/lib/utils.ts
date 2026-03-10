@@ -5,6 +5,13 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/** Format an ISO timestamp string to a short time display (e.g. "10:00 AM"). */
+export function formatTimestamp(isoOrLegacy: string): string {
+  const date = new Date(isoOrLegacy);
+  if (isNaN(date.getTime())) return isoOrLegacy; // fallback for legacy "10:00 AM" strings
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
 export function clampPercent(value: number) {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(100, Math.round(value)));

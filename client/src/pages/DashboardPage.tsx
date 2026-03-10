@@ -86,7 +86,7 @@ export default function DashboardPage() {
   });
 
   const handleSendMessage = (content: string) => {
-    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timestamp = new Date().toISOString();
     const newMessage: Message = {
       id: `local-${Date.now()}`,
       role: 'user',
